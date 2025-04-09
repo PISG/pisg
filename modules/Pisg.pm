@@ -215,6 +215,7 @@ sub get_default_config_settings
         botnicks => '',            # Needed for DCpp format (non-irc)
 
         statsdump => '',           # Debug option
+        statsjson => '',           # Json export
         modules_dir => '',         # set in get_cmdline_options
         cchannels => '',           # set in get_cmdline_options
 
