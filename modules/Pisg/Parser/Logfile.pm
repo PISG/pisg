@@ -11,6 +11,7 @@ $^W = 1;
 # the log cache
 use Data::Dumper;
 $Data::Dumper::Indent = 1;
+use JSON;
 my $cache;
 
 # test for Text::Iconv
@@ -168,6 +169,11 @@ sub analyze
     if ($self->{cfg}->{statsdump}) {
         open C, "> $self->{cfg}->{statsdump}" or die "$self->{cfg}->{statsdump}: $!";
         print C Data::Dumper->Dump([\%stats, \%lines], ["stats", "lines"]);
+        close C;
+    }
+    if ($self->{cfg}->{statsjson}) {
+        open C, "> $self->{cfg}->{statsjson}" or die "$self->{cfg}->{statsjson}: $!";
+        print C encode_json(["stats" => \%stats, "lines" => \%lines]);
         close C;
     }
 
