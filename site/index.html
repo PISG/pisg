@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRC channel stats</title>
+<!--
+  pisg landing page: one static file, no PHP, no cron, no libraries.
+
+  pisg writes channels.json next to each channel page (option ChannelIndex): for every channel its
+  totals, a 24-hour profile, the last 30 days and the top talkers. This page turns that into the
+  statistics of the statistics: what all channels add up to, how they compare, and a link to each
+  channel's own page. Copy this file into the folder your channel pages are written to, next to
+  channels.json. It works on any static host, including GitHub Pages.
+
+  Change the two lines marked EDIT below to rename the page.
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --fg: #171b21; --muted: #59626d; --line: #e0e3e8; --line2: #c6ccd4; --hover: #eceff3;
+  --mark: #2a78d6; --t0: #4a3aa7; --t1: #eda100; --t2: #1baf7a; --t3: #eb6834;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1318; --surface: #171c23; --fg: #e8ebef; --muted: #98a2ae; --line: #252c35; --line2: #38414c; --hover: #1b2129;
+          --mark: #3987e5; --t0: #9085e9; --t1: #c98500; --t2: #199e70; --t3: #d95926; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; padding: 32px 24px 64px; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+main { max-width: 1240px; margin: 0 auto; }
+:root { --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+a { color: inherit; }
+a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
+
+h1 { margin: 4px 0 6px; font: 700 clamp(24px, 4.6vw, 40px)/1.15 var(--mono); letter-spacing: -0.035em; overflow-wrap: anywhere; }
+.lead { margin: 0 0 8px; color: var(--muted); }
+
+/* headline sentence and facts: same shape as the overview on the channel pages */
+.hero { margin: 28px 0 18px; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.3; font-weight: 600; text-wrap: balance; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 48px; margin: 0; }
+.fact { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fact dt { color: var(--muted); }
+.fact dd { margin: 0; text-align: right; font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; }
+.fact small { display: block; font: 400 12px/1.3 system-ui, sans-serif; color: var(--muted); }
+
+section { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line2); }
+h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.25; font-weight: 650; letter-spacing: -0.01em; }
+.intro { margin: 2px 0 16px; max-width: 68ch; color: var(--muted); }
+
+/* one row per channel */
+.cols, .row { display: grid; gap: 8px 24px; align-items: center;
+  grid-template-columns: minmax(150px, 1.15fr) minmax(190px, 1.5fr) minmax(150px, 1.1fr) minmax(200px, 1.5fr) minmax(120px, .8fr); }
+.cols { padding: 8px 0; border-bottom: 1px solid var(--line2); color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.row { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.row:hover { background: var(--hover); }
+.name > a:first-child { font: 700 17px/1.2 var(--mono); letter-spacing: -0.02em; text-decoration-color: var(--line2); text-underline-offset: 4px; overflow-wrap: anywhere; }
+.name > a:first-child:hover { text-decoration-color: currentColor; }
+.btn, .btn:link, .btn:visited { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 5px 12px; border: 1px solid var(--line2); border-radius: 6px;
+  background: var(--surface); color: var(--fg); font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; }
+.btn:hover { background: var(--bg); border-color: var(--fg); }
+.btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.sub { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.big { font: 600 15px/1.2 var(--mono); }
+.track { height: 8px; margin: 6px 0 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.fill { height: 100%; border-radius: 4px; background: var(--mark); }
+.what { font-family: var(--mono); font-weight: 600; }
+
+/* 24-hour profile: one bar per hour, coloured by time of day like the channel pages */
+.hours { display: flex; align-items: flex-end; gap: 2px; height: 38px; }
+.hours i { flex: 1 1 0; min-width: 0; border-radius: 2px 2px 0 0; }
+.hours .h0 { background: var(--t0); } .hours .h1 { background: var(--t1); }
+.hours .h2 { background: var(--t2); } .hours .h3 { background: var(--t3); }
+.hticks { display: flex; justify-content: space-between; margin-top: 3px; color: var(--muted); font: 11px/1 var(--mono); }
+.spark { display: block; width: 100%; max-width: 170px; height: 38px; }
+.spark rect { fill: var(--mark); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; background: var(--c); }
+
+/* who talks most, per channel */
+.talkers { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 28px 40px; margin-top: 18px; }
+.talkers h3 { margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line2); font: 700 15px/1.2 var(--mono); }
+.talkers ol { margin: 0; padding: 0; list-style: none; }
+.talkers li { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.talkers li b { font: 600 14px/1.2 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talkers li .track { margin: 0; }
+.talkers li span { color: var(--muted); font-size: 13px; }
+
+.msg { margin-top: 24px; padding: 14px 0; border-top: 1px solid var(--line2); color: var(--muted); }
+.msg strong { color: var(--fg); }
+code { padding: .1em .35em; border-radius: 4px; background: var(--surface); border: 1px solid var(--line); font-size: .9em; }
+footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+/* narrower: each channel becomes a small block, the column titles go away */
+@media (max-width: 980px) {
+  .cols { display: none; }
+  .row { grid-template-columns: 1fr 1fr; padding: 18px 0; }
+  .row > .name { grid-column: 1 / -1; }
+  .row > .profile { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  body { padding: 24px 16px 48px; }
+  .row { grid-template-columns: 1fr; }
+  .fact { gap: 10px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="site-title">IRC channel stats</h1>
+  <p class="lead" id="site-lead">What the channels add up to, and where to read more about each one.</p>
+
+  <div id="overview" hidden>
+    <p class="hero" id="hero"></p>
+    <dl class="facts" id="facts"></dl>
+  </div>
+
+  <section id="channels" hidden>
+    <h2>Channels</h2>
+    <p class="intro">Every channel that has a statistics page, busiest first. Open one for the full page.</p>
+    <div class="cols" aria-hidden="true">
+      <div>Channel</div><div>Lines</div><div>Busiest hour</div><div>Through the day</div><div>Last 30 days</div>
+    </div>
+    <div id="rows"></div>
+    <p class="legend" aria-hidden="true">
+      <span style="--c: var(--t0)">night 0&ndash;5</span><span style="--c: var(--t1)">morning 6&ndash;11</span>
+      <span style="--c: var(--t2)">afternoon 12&ndash;17</span><span style="--c: var(--t3)">evening 18&ndash;23</span>
+    </p>
+  </section>
+
+  <section id="people" hidden>
+    <h2>Who talks most</h2>
+    <p class="intro">The five busiest people in each channel (bots left out where pisg knows them), with their share of the line count shown against the busiest of the five.</p>
+    <div class="talkers" id="talkers"></div>
+  </section>
+
+  <div class="msg" id="status" role="status">Loading channels&hellip;</div>
+  <noscript><div class="msg">This page needs JavaScript to list the channels.</div></noscript>
+
+  <footer>Statistics generated by <a href="https://github.com/PISG/pisg">pisg</a></footer>
+</main>
+
+<script>
+"use strict";
+
+// EDIT: the heading and the sentence under it
+var SITE_TITLE = "IRC channel stats";
+var SITE_LEAD = "What the channels add up to, and where to read more about each one.";
+// Where pisg writes the channel list (pisg option ChannelIndex), next to this page.
+var INDEX_URL = "channels.json";
+
+var $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;      // textContent: names are never parsed as HTML
+  return e;
+}
+
+document.title = SITE_TITLE;
+$("site-title").textContent = SITE_TITLE;
+$("site-lead").textContent = SITE_LEAD;
+
+function say(html) { $("status").hidden = false; $("status").innerHTML = html; }
+function clearSay() { $("status").hidden = true; }
+
+// The channel list is data pisg wrote, but treat it as untrusted anyway: only accept a
+// plain relative .html path, so a bad entry can never become a javascript: or offsite URL.
+function safeFile(f) {
+  return typeof f === "string" && /^[\w.\-]+(\/[\w.\-]+)*\.html?$/i.test(f) && f.indexOf("..") === -1;
+}
+function norm(s) {
+  s = String(s).replace(/^#+/, "").toLowerCase();
+  return s.normalize ? s.normalize("NFD").replace(/[̀-ͯ]/g, "") : s;
+}
+function whole(v) { return typeof v === "number" && isFinite(v) ? v : 0; }
+function list(v, n) { return Array.isArray(v) && (n === undefined || v.length === n) ? v.map(whole) : null; }
+function fmt(n) { return Math.round(n).toLocaleString(); }
+function fmt1(n) { return n >= 100 ? fmt(n) : (Math.round(n * 10) / 10).toLocaleString(); }
+function pct(n, d) { return d ? (Math.round(1000 * n / d) / 10).toLocaleString() + "%" : "0%"; }
+function hourRange(h) { function p(x) { return (x < 10 ? "0" : "") + x; } return p(h) + ":00–" + p((h + 1) % 24) + ":00"; }
+
+function ago(iso) {
+  var t = Date.parse(iso);
+  if (isNaN(t)) return "";
+  var s = Math.round((t - Date.now()) / 1000), a = Math.abs(s);
+  var units = [["day", 86400], ["hour", 3600], ["minute", 60]];
+  var rtf = typeof Intl !== "undefined" && Intl.RelativeTimeFormat ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }) : null;
+  for (var i = 0; i < units.length; i++) {
+    if (a >= units[i][1]) {
+      var n = Math.round(s / units[i][1]);
+      return rtf ? rtf.format(n, units[i][0]) : Math.abs(n) + " " + units[i][0] + "(s) ago";
+    }
+  }
+  return "just now";
+}
+
+// Everything worked out once, from the numbers pisg wrote. Older channels.json files have fewer fields;
+// whatever is missing simply leaves that piece out.
+function prepare(c) {
+  var hours = list(c.hours, 24), total = 0, peak = 0, i;
+  if (hours) for (i = 0; i < 24; i++) { total += hours[i]; if (hours[i] > hours[peak]) peak = i; }
+  var lines = whole(c.lines), days = whole(c.days);
+  return {
+    c: c, name: String(c.name), file: c.file, lines: lines, nicks: whole(c.nicks), days: days,
+    lpd: days ? lines / days : 0, words: whole(c.words), links: whole(c.links), questions: whole(c.questions),
+    hours: hours, hoursTotal: total, peak: peak, recent: list(c.recent),
+    top: Array.isArray(c.top) ? c.top.filter(function (t) { return t && typeof t.nick === "string"; }) : []
+  };
+}
+
+function sum(rows, k) { return rows.reduce(function (a, r) { return a + r[k]; }, 0); }
+
+function fact(dt, dd, sub) {
+  var f = el("div", "fact"), t = el("dt", null, dt), d = el("dd", "num", dd);
+  if (sub) d.appendChild(el("small", null, sub));
+  f.appendChild(t); f.appendChild(d);
+  return f;
+}
+function heroBit(text) { var b = el("b", null, text); return b; }
+
+function renderOverview(rows, newest) {
+  var lines = sum(rows, "lines"), days = rows.reduce(function (a, r) { return Math.max(a, r.days); }, 0);
+  var hero = $("hero");
+  hero.textContent = "";
+  hero.appendChild(heroBit(fmt(lines) + " lines"));
+  hero.appendChild(document.createTextNode(" in "));
+  hero.appendChild(heroBit(fmt(rows.length) + (rows.length === 1 ? " channel" : " channels")));
+  if (days) { hero.appendChild(document.createTextNode(", up to ")); hero.appendChild(heroBit(fmt(days) + " days")); hero.appendChild(document.createTextNode(" of history")); }
+
+  var f = $("facts");
+  f.textContent = "";
+  var lpd = rows.reduce(function (a, r) { return a + r.lpd; }, 0);
+  if (lpd) f.appendChild(fact("Lines per day, all channels", fmt(lpd)));
+  var busiest = rows.slice().sort(function (a, b) { return b.lpd - a.lpd; })[0];
+  if (busiest && busiest.lpd && rows.length > 1) f.appendChild(fact("Busiest channel", busiest.name, fmt(busiest.lpd) + " lines a day"));
+
+  // Hour by hour across every channel that has an hour profile.
+  var pool = [], t = 0, h;
+  for (h = 0; h < 24; h++) pool.push(0);
+  rows.forEach(function (r) { if (r.hours) r.hours.forEach(function (v, i) { pool[i] += v; t += v; }); });
+  if (t) {
+    var hi = 0, lo = 0;
+    for (h = 1; h < 24; h++) { if (pool[h] > pool[hi]) hi = h; if (pool[h] < pool[lo]) lo = h; }
+    f.appendChild(fact("Busiest hour, all channels", hourRange(hi), pct(pool[hi], t) + " of all lines"));
+    f.appendChild(fact("Quietest hour", hourRange(lo), pct(pool[lo], t) + " of all lines"));
+  }
+  var words = sum(rows, "words"), links = sum(rows, "links"), q = sum(rows, "questions");
+  if (words) f.appendChild(fact("Words", fmt(words), fmt1(words / Math.max(lines, 1)) + " per line"));
+  if (links) f.appendChild(fact("Links shared", fmt(links)));
+  if (q) f.appendChild(fact("Questions asked", fmt(q), pct(q, lines) + " of lines"));
+  if (newest) f.appendChild(fact("Last update", ago(newest) || "just now"));
+  $("overview").hidden = false;
+}
+
+function hoursChart(r) {
+  var wrap = el("div"), box = el("div", "hours");
+  if (!r.hours || !r.hoursTotal) return wrap;
+  var max = r.hours[r.peak] || 1;
+  r.hours.forEach(function (v, i) {
+    var b = el("i", "h" + Math.floor(i / 6));
+    b.style.height = Math.max(6, Math.round(100 * v / max)) + "%";     // the smallest hour still shows as a stub
+    b.title = (i < 10 ? "0" : "") + i + ":00 – " + pct(v, r.hoursTotal) + " of this channel's lines";
+    box.appendChild(b);
+  });
+  var ticks = el("div", "hticks");
+  ["0", "6", "12", "18", "23"].forEach(function (x) { ticks.appendChild(el("span", null, x)); });
+  wrap.appendChild(box); wrap.appendChild(ticks);
+  return wrap;
+}
+
+function sparkline(r) {
+  var NS = "http://www.w3.org/2000/svg", vals = r.recent;
+  if (!vals || !vals.length) return el("span", "sub", "");
+  var w = 150, h = 38, gap = 1.5, n = vals.length, bw = (w - gap * (n - 1)) / n;
+  var max = vals.reduce(function (a, v) { return Math.max(a, v); }, 0) || 1;
+  var svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+  svg.setAttribute("class", "spark");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Lines per day over the last " + n + " days of the log, busiest day " + fmt(max) + " lines");
+  vals.forEach(function (v, i) {
+    var bh = Math.max(1, Math.round(h * v / max)), rc = document.createElementNS(NS, "rect");
+    rc.setAttribute("x", (i * (bw + gap)).toFixed(2)); rc.setAttribute("y", h - bh);
+    rc.setAttribute("width", bw.toFixed(2)); rc.setAttribute("height", bh);
+    var tt = document.createElementNS(NS, "title"); tt.textContent = fmt(v) + " lines";
+    rc.appendChild(tt); svg.appendChild(rc);
+  });
+  var box = el("div");
+  box.appendChild(svg);
+  box.appendChild(el("span", "sub", "busiest day " + fmt(max)));
+  return box;
+}
+
+function renderRows(rows) {
+  var host = $("rows"), max = rows.reduce(function (a, r) { return Math.max(a, r.lines); }, 0) || 1, total = sum(rows, "lines");
+  host.textContent = "";
+  rows.forEach(function (r) {
+    var row = el("div", "row");
+
+    var name = el("div", "name"), a = el("a", null, r.name);
+    a.href = r.file;
+    name.appendChild(a);
+    var meta = [];
+    if (r.c.network) meta.push(String(r.c.network));
+    var when = ago(r.c.updated);
+    if (when) meta.push("updated " + when);
+    if (meta.length) name.appendChild(el("span", "sub", meta.join(" · ")));
+    var view = el("a", "btn", "View stats \u2192");
+    view.href = r.file;
+    view.setAttribute("aria-label", "View the statistics of " + r.name);
+    name.appendChild(view);
+    row.appendChild(name);
+
+    var vol = el("div"), big = el("span", "big num", fmt(r.lines));
+    vol.appendChild(big);
+    vol.appendChild(document.createTextNode(" "));
+    vol.appendChild(el("span", "sub", pct(r.lines, total) + " of all"));
+    var track = el("div", "track"), fill = el("div", "fill");
+    fill.style.width = Math.max(1, Math.round(100 * r.lines / max)) + "%";
+    track.appendChild(fill); vol.appendChild(track);
+    var bits = [];
+    if (r.nicks) bits.push(fmt(r.nicks) + " nicks");
+    if (r.lpd) bits.push(fmt(r.lpd) + " a day");
+    if (r.days) bits.push(fmt(r.days) + " days");
+    vol.appendChild(el("span", "sub", bits.join(" · ")));
+    row.appendChild(vol);
+
+    var busy = el("div");
+    if (r.hoursTotal) {
+      busy.appendChild(el("span", "what num", hourRange(r.peak)));
+      busy.appendChild(el("span", "sub", pct(r.hours[r.peak], r.hoursTotal) + " of its lines"));
+    }
+    if (r.top.length) busy.appendChild(el("span", "sub", "top: " + r.top[0].nick + " (" + pct(whole(r.top[0].lines), r.lines) + ")"));
+    row.appendChild(busy);
+
+    var prof = hoursChart(r); prof.className = "profile";
+    row.appendChild(prof);
+    var spark = sparkline(r); spark.classList.add("trend");
+    row.appendChild(spark);
+    host.appendChild(row);
+  });
+  $("channels").hidden = false;
+}
+
+function renderPeople(rows) {
+  var host = $("talkers"), shown = 0;
+  host.textContent = "";
+  rows.forEach(function (r) {
+    if (!r.top.length) return;
+    shown++;
+    var box = el("div"), h3 = el("h3"), a = el("a", null, r.name);
+    a.href = r.file; h3.appendChild(a); box.appendChild(h3);
+    var ol = el("ol"), best = whole(r.top[0].lines) || 1;
+    r.top.slice(0, 5).forEach(function (t) {
+      var li = el("li"), tr = el("div", "track"), fl = el("div", "fill");
+      fl.style.width = Math.max(2, Math.round(100 * whole(t.lines) / best)) + "%";
+      tr.appendChild(fl);
+      li.appendChild(el("b", null, t.nick)); li.appendChild(tr);
+      li.appendChild(el("span", "num", fmt(whole(t.lines)) + " · " + pct(whole(t.lines), r.lines)));
+      li.firstChild.title = t.nick;
+      ol.appendChild(li);
+    });
+    box.appendChild(ol);
+    host.appendChild(box);
+  });
+  $("people").hidden = !shown;
+}
+
+function start(list) {
+  var chans = list.filter(function (c) { return c && typeof c.name === "string" && safeFile(c.file); });
+  if (!chans.length) {
+    say("<strong>No channels yet.</strong> Run <code>pisg</code> once: it writes <code>channels.json</code> next to its pages.");
+    return;
+  }
+  // Old links looked like  index.html#canada  and opened that channel: keep them working.
+  var want = norm((function () { var h = location.hash.replace(/^#/, ""); try { h = decodeURIComponent(h); } catch (e) {} return h; })());
+  if (want) {
+    for (var i = 0; i < chans.length; i++) if (norm(chans[i].name) === want) { location.replace(chans[i].file); return; }
+  }
+  var rows = chans.map(prepare).sort(function (a, b) { return b.lines - a.lines; });
+  var newest = chans.map(function (c) { return c.updated; }).filter(Boolean).sort().pop();
+  document.title = SITE_TITLE;
+  clearSay();
+  renderOverview(rows, newest);
+  renderRows(rows);
+  renderPeople(rows);
+}
+
+fetch(INDEX_URL, { cache: "no-store" })
+  .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(function (d) {
+    if (!d || !Array.isArray(d.channels)) throw new Error("unexpected format");
+    start(d.channels);
+  })
+  .catch(function () {
+    say("<strong>Could not load the channel list.</strong> Run <code>pisg</code> so it creates " +
+        "<code>" + INDEX_URL + "</code>, and keep this page in the same folder as your channel pages.");
+  });
+</script>
+</body>
+</html>

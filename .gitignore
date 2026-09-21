@@ -1,0 +1,11 @@
+output/
+pisg_cron.log
+*.tar.gz
+*.swp
+*.dump
+__pycache__/
+*.pyc
+aliases.auto.cfg
+users.cfg
+pisg.cfg.new
+pisg.cfg.bak-*

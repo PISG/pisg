@@ -62,11 +62,12 @@ if (\$version) {
     print \$pisg->{cfg}->{version} . "\n";
 } else {
     \$pisg->run();
+    exit 1 if \$pisg->{failed_channels};       # some channel was skipped (already reported above)
 }
 END
     if ($@) {
         print STDERR "Could not load pisg! Reason:\n$@\n";
-        return undef;
+        exit 1;                    # so cron and monitoring can see that it failed
     }
 }
 

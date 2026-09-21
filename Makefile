@@ -21,6 +21,7 @@ FILES = pisg \
 	 COPYING \
 	 README \
 	 pisg.cfg \
+	 pisg.cfg.example \
 	 lang.txt
 
 DOCS = docs/FORMATS \
@@ -47,6 +48,10 @@ SCRIPTS = scripts/crontab \
 	   scripts/dropegg.pl \
 	   scripts/egg2mirc.awk \
 	   scripts/eggdrop-pisg.tcl \
+	   scripts/eggdrop-pisg-test.tcl \
+	   scripts/pisg-autoalias.py \
+	   scripts/pisg-autoalias-test.py \
+	   scripts/adiirc2eggdrop.py scripts/znc-setup.sh \
 	   scripts/mirc2egg.sed \
 	   scripts/sirc-timestamp.pl \
 	   scripts/windows-ftp-upload.txt
@@ -62,7 +67,8 @@ MODULESDIR = modules
 MAIN_MODULE = $(MODULESDIR)/Pisg.pm
 
 PISG_MODULES = $(MODULESDIR)/Pisg/Common.pm \
-	       $(MODULESDIR)/Pisg/HTMLGenerator.pm
+	       $(MODULESDIR)/Pisg/HTMLGenerator.pm \
+	       $(MODULESDIR)/Pisg/Insights.pm
 
 PARSER_MODULES = $(MODULESDIR)/Pisg/Parser/Logfile.pm
 
@@ -135,7 +141,10 @@ release: docs
 	cp -r $(DOCS) $(DIRNAME)/docs
 
 	mkdir $(DIRNAME)/layout
-	cp layout/*.css $(DIRNAME)/layout
+	cp layout/*.css layout/*.js layout/build-themes.py $(DIRNAME)/layout
+
+	mkdir $(DIRNAME)/site
+	cp site/index.html site/README.txt $(DIRNAME)/site
 
 	mkdir $(DIRNAME)/docs/dev
 	cp $(DEVDOCS) $(DIRNAME)/docs/dev

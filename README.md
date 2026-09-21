@@ -5,10 +5,24 @@ show for the users of your channel.
 The supported logfile formats is explained in the FORMATS file included with
 this distribution in the 'docs' directory.
 
+QUICK START (NEW TO PISG?)
+-------------------------
+Run the guided setup. It finds the IRC logs already on your computer (eggdrop,
+ZNC, irssi, WeeChat, HexChat, mIRC, AdiIRC), asks a few questions, writes
+pisg.cfg, makes your first stats page and explains how to keep it up to date
+and host it for free:
+
+    $ perl setup.pl
+
+It works on Linux, macOS and Windows (with Perl installed, for example
+Strawberry Perl). 'perl setup.pl --dry-run' shows what it would do without
+changing anything.
+
 SETTING UP PISG
 ---------------
-Full documentation for pisg is located in 'docs/pisg-doc.txt' and
-'docs/html/index.html' for a HTML version.
+Full documentation for pisg is located in 'docs/pisg-doc.html' (one web page,
+with a complete example configuration at the end) and in 'docs/pisg-doc.xml'.
+A ready-to-copy configuration listing every option is in 'pisg.cfg.example'.
 
 Quick usage instructions below:
 
@@ -22,6 +36,23 @@ where you can insert your own data.
 
 The commandline version has the disadvantage that you can only set up one
 channel to be run.
+
+WHAT'S NEW IN 1.0.a
+-------------------
+ * A guided setup: 'perl setup.pl'.
+ * Modern light/dark themes, a menu down the left side on wide screens (a slim
+   section bar on phones), and an interactive relation map ('who talks to
+   whom'), plus overview, roles, time personalities and more.
+ * A landing page with the statistics of your statistics and a page per
+   channel: copy 'site/index.html' next to your stats pages (pisg writes
+   'channels.json' for it).
+ * Several channels in one run: a channel that cannot be read is skipped and
+   the others are still made.
+ * BadUrls (keep spam links out of the stats).
+ * Safer output: a page is only replaced once it is complete.
+ * Optional tools in 'scripts/': profiles people edit from IRC (eggdrop),
+   automatic nick merging, and log converters.
+ See 'docs/Changelog' for the full list.
 
 RUNNING PISG
 ------------

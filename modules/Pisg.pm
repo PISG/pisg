@@ -115,6 +115,7 @@ sub get_default_config_settings
         logsuffix => '',
         silent => 0,
         cachedir => '',
+        channelindex => 'channels.json',
         userpics => 'y',
 
         # Colors / Layout
@@ -208,6 +209,16 @@ sub get_default_config_settings
         violentwords => 'slaps beats smacks',
         chartsregexp => '(?:is )?(?:np:|(?:now )?playing:? |listening to:? )(?:MPEG stream from)?\s*(.*)',
         ignorewords => '',
+        badurls => '',
+        shownavbar => 1,
+        homelink => '',
+        showoverview => 1,
+        showrelations => 1,
+        relationnicks => 30,
+        relationminweight => 3,
+        showtimepersonalities => 1,
+        showconcentration => 1,
+        showsignaturewords => 1,
         noignoredquotes => 0,
         tablewidth => 574,
         regexpaliases => 0,
@@ -218,7 +229,7 @@ sub get_default_config_settings
         modules_dir => '',         # set in get_cmdline_options
         cchannels => '',           # set in get_cmdline_options
 
-        version => "0.80-preview2"
+        version => "1.0.a"
     };
 
     # This enables us to use the search_path in other modules
@@ -478,6 +489,7 @@ sub do_channel
     } else {
         $self->init_pisg();        # Init some general things
 
+        $self->{aliases_stored} = 1;
         store_aliases();           # Save the aliases so we can restore them
                                    # later, we don't want to add the aliases
                                    # for this channel to the next channel
@@ -533,6 +545,7 @@ _END
         }
 
         restore_aliases();
+        $self->{aliases_stored} = 0;
 
         $self->{cfg}->{chan_done}{$self->{cfg}->{channel}} = 1;
     }
@@ -567,7 +580,16 @@ sub parse_channels
         foreach my $chan (keys %{ $channel }) { # import channel specific config
             $self->{cfg}->{$_} = $channel->{$chan}->{$_} foreach (keys %{ $channel->{$chan} });
         }
-        $self->do_channel();
+        # One channel that cannot be read (a missing log folder, a bad format) must not stop the others:
+        # say so, carry on, and let the exit status tell cron that something failed.
+        my $name = $self->{cfg}->{channel};
+        unless (eval { $self->do_channel(); 1 }) {
+            my $why = $@; $why =~ s/\s+$//;
+            print STDERR "Skipped channel $name: $why\n";
+            $self->{failed_channels}++;
+            restore_aliases() if $self->{aliases_stored};
+            $self->{aliases_stored} = 0;
+        }
         $origcfg{chan_done} = $self->{cfg}->{chan_done};
         %{ $self->{cfg} } = %origcfg;
     }

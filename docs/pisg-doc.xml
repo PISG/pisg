@@ -5,7 +5,7 @@
 
 <book id="pisg-documentation">
   <bookinfo>
-    <title>pisg 0.73 documentation</title>
+    <title>pisg 1.0.a documentation</title>
     <subtitle>How to install and configure pisg</subtitle>
   </bookinfo>
   <toc></toc>
@@ -1085,6 +1085,102 @@
     <refsect1>
     <title>Default</title>
     <para> Unset </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ChannelIndex">
+
+    <refmeta> <refentrytitle>ChannelIndex</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ChannelIndex</refname>
+    <refpurpose>name of the channel list file for a landing page</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ChannelIndex="channels.json">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Each time pisg writes a channel page, it also updates a small JSON file, next to
+    that page, listing the channels found in the same directory: the channel name as
+    written in the <xref linkend="Channel" /> setting, the page file name, the network, when
+    it was updated, and the number of days, nicks and lines. A landing page can read this
+    file to offer a drop-down list of channels (see <filename>site/index.html</filename>), so
+    nothing has to scan or scrape the HTML pages. Each run only changes the entry of its
+    own channel, and entries whose page no longer exists are removed. Set it to "none"
+    to switch this off.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> channels.json </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="HomeLink">
+
+    <refmeta> <refentrytitle>HomeLink</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>HomeLink</refname>
+    <refpurpose>adds a button at the top of every stats page that leads back to your landing page</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set HomeLink="index.html">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows an "All channels" button above the title of each stats page (translated with the
+    page language). Give the page it should lead to: a file name next to the stats page, such as
+    <filename>index.html</filename> (the landing page in <filename>site/</filename>), or a full
+    http(s) address. Leave it empty, or "none", for no button. Only the newer colour schemes
+    draw it as a button; a scheme set to "none" does not show it.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> empty (no button) </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ShowNavBar">
+
+    <refmeta> <refentrytitle>ShowNavBar</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowNavBar</refname>
+    <refpurpose>enable/disable the section bar at the top of the page</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowNavBar="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Adds a slim bar at the top of the stats page that stays in view while scrolling. It shows which
+    section is being read, and a "Sections" button opens a list of every section, laid out in columns so
+    nothing has to be scrolled sideways, whatever the number of sections or the language. It also works
+    without JavaScript. The bar is left out when <xref linkend="ColorScheme" /> is "none",
+    since the page is then meant to be embedded in another one.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
     </refsect1>
     </refentry>
 
@@ -2356,6 +2452,210 @@
     </refsect1>
     </refentry>
 
+    <refentry id="ShowOverview">
+
+    <refmeta> <refentrytitle>ShowOverview</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowOverview</refname>
+    <refpurpose>enable/disable the channel overview</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowOverview="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows a row of key numbers at the top of the page: lines, words, nicks, days covered, lines
+    per day, the busiest and quietest hour, questions, links shared, the top talker and the
+    number of joins and kicks.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ShowRelations">
+
+    <refmeta> <refentrytitle>ShowRelations</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowRelations</refname>
+    <refpurpose>enable/disable the relation map and its tables</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowRelations="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows who talks to whom: an interactive map (click a nick or a line for details), a table of
+    the closest pairs, and the "social roles" (who is talked to the most, the best listener, ...).
+    Two people are connected when one starts a line with the other's nick ("Bob: hi"), mentions
+    them, or answers right after them. A line addressed to someone counts three times as much as
+    a mention or a quick reply. Nicks that are joined by <xref linkend="NickTracking" /> or a user alias
+    count as one person. Bots are left out: mark a bot with <![CDATA[<user nick="Bot" sex="b">]]> to keep it in the
+    other statistics but off the map, or with ignore="y" to remove it altogether. Nicks that are also
+    ordinary words (and the channel name) are not counted as mentions.
+    See also <xref linkend="RelationNicks" /> and <xref linkend="RelationMinWeight" />.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="RelationNicks">
+
+    <refmeta> <refentrytitle>RelationNicks</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>RelationNicks</refname>
+    <refpurpose>number of nicks on the relation map</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set RelationNicks="30">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    The map shows this many of the most active people (bots excluded). More than about 40 makes
+    the picture crowded.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 30 </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="RelationMinWeight">
+
+    <refmeta> <refentrytitle>RelationMinWeight</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>RelationMinWeight</refname>
+    <refpurpose>minimum connection strength shown as a line on the relation map</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set RelationMinWeight="3">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Connections weaker than this are not drawn, which keeps the map readable. A line addressed to
+    someone is worth 3, a mention 1 and a quick reply 1. Raise it for a busy channel, lower it for a quiet one.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 3 </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ShowTimePersonalities">
+
+    <refmeta> <refentrytitle>ShowTimePersonalities</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowTimePersonalities</refname>
+    <refpurpose>enable/disable the time personalities section</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowTimePersonalities="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows who chats mostly at night (0-5h), in the morning (6-11h), in the afternoon (12-17h) and
+    in the evening (18-23h), for the people with enough lines. The hours follow <xref linkend="TimeOffset" />.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ShowConcentration">
+
+    <refmeta> <refentrytitle>ShowConcentration</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowConcentration</refname>
+    <refpurpose>enable/disable the "who carries the channel" section</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowConcentration="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows how much of the channel the busiest people write: the share of all lines written by the
+    top 1, 3, 5, 10 and 20 nicks, and how many nicks wrote half of everything.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="ShowSignatureWords">
+
+    <refmeta> <refentrytitle>ShowSignatureWords</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>ShowSignatureWords</refname>
+    <refpurpose>enable/disable the signature words section</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set ShowSignatureWords="1">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Shows, for each of the regular talkers, the word they use a lot and that hardly anyone else uses.
+    Short words, nicks and links are ignored (see <xref linkend="WordLength" /> and <xref linkend="IgnoreWords" />).
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> 1 (enabled) </para>
+    </refsect1>
+    </refentry>
+
     <!-- *** IGNOREWORDS *** -->
     <refentry id="IgnoreWords">
 
@@ -2477,6 +2777,52 @@
     <refsect1>
     <title>Default</title>
     <para> slaps beats smacks </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="BadUrls">
+
+    <refmeta> <refentrytitle>BadUrls</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>BadUrls</refname>
+    <refpurpose>words that keep a URL out of the URL statistics</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <channel="#channel">
+         Logfile = "channel.log"
+         Format = "xchat"
+         BadUrls = "imagetwist imgur.com postimg.cc/*"
+        </channel>
+
+        <set BadUrls="imagetwist imgur.com postimg.cc/*">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    BadUrls is a list of words, separated by spaces, much like <xref linkend="FoulWords" />.
+    A URL that contains any of the words is not counted, so it never shows up in
+    "Most referenced URLs" (see <xref linkend="ShowMru" />). Use it to keep spam and
+    unwanted image hosts out of the statistics.
+    A word matches anywhere in the URL, whatever the case, so "imgur.com" also
+    removes "https://i.imgur.com/abc.png". Two wildcards are understood: * stands for
+    any run of characters and ? for exactly one character. So "postimg.cc/*" removes
+    every link to postimg.cc (including "i.postimg.cc/x.png") but not
+    "example.org/postimg.cc", where nothing follows the name, and "*.example.org/*"
+    removes links on any subdomain of example.org but not on example.org itself.
+    Apart from the wildcards the words are plain text, not regular expressions, so
+    characters such as . + ( ) [ ] | mean exactly themselves. A lone * would remove every
+    URL. To hide a single exact address instead, use the
+    <link linkend="ignoring-links">link ignore</link> setting.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> unset (no URLs are removed) </para>
     </refsect1>
     </refentry>
 

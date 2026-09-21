@@ -1,0 +1,430 @@
+# pisg.cfg.example - a complete configuration for pisg, ready to copy.
+#
+#   1. Copy this file to pisg.cfg
+#   2. Change the values marked  EDIT  (log path, format, network, output file, name)
+#   3. Run ./pisg
+#
+# Every option pisg understands is listed below with its meaning. Options are set to
+# pisg's own default unless the comment says "recommended". Lines starting with # are
+# comments; an option shown commented out is off/unset - remove the # to use it.
+#
+# Syntax reminders:
+#   <set Name="value">      a global option, applies to every channel
+#   <channel="#name"> ... </channel>   settings for one channel (they override <set>)
+#   <user nick="..." ...>   per-user settings
+# Each <set> must be on one line, and every value must be in quotes.
+
+
+##############################################################################
+#  GLOBAL OPTIONS - apply to every channel below
+##############################################################################
+
+# ---- General options -------------------------------------------------------
+
+# use a different color scheme for stats page - recommended: modern, light/dark theme;
+# try midnight, amoled, terminal, canada, or default
+<set ColorScheme="modern">
+
+# alternate stylesheets for stats page - extra stylesheets the visitor can switch to
+#<set AltColorScheme="midnight.css amoled.css">
+
+# define the language / translation to use
+<set Lang="EN">
+
+# define a file as page header - HTML file inserted above the statistics
+#<set PageHead="header.html">
+
+# define a file as page footer - HTML file inserted below the statistics
+#<set PageFoot="footer.html">
+
+# make pisg silent, suppress messages
+<set Silent="0">
+
+# use a cache to speed up log parsing - cache parsed logs here to speed up runs (delete
+# it when you change settings)
+#<set CacheDir="cache/">
+
+# name of the channel list file for a landing page
+<set ChannelIndex="channels.json">
+
+# adds a button at the top of every stats page that leads back to your landing page
+<set HomeLink="">
+
+# enable/disable the section bar at the top of the page
+<set ShowNavBar="1">
+
+# ---- Options for various statistics features -------------------------------
+
+# number of days to show in "Daily Actitity" - recommended: show the last 14 days as a
+# bar chart
+<set DailyActivity="14">
+
+# enable/disable "Most Active Times"
+<set ShowActiveTimes="1">
+
+# enable/disable "Most Active Nicks"
+<set ShowActiveNicks="1">
+
+# enable/disable "Big Numbers" sections
+<set ShowBigNumbers="1">
+
+# enable/disable "Latest topics" sections
+<set ShowTopics="1">
+
+# enable/disable "number of lines"
+<set ShowLines="1">
+
+# enable/disable "words per line" - recommended: also show words per line
+<set ShowWpl="1">
+
+# enable/disable "characters per line" - recommended: also show characters per line
+<set ShowCpl="1">
+
+# enable/disable "number of words" - recommended: also show total words
+<set ShowWords="1">
+
+# show when a user was last seen on a channel
+<set ShowLastSeen="1">
+
+# show when a nick was active
+<set ShowTime="1">
+
+# mIRCStats like behaviour of time bar
+<set ShowLineTime="0">
+
+# ShowLineTime like behavior of words column
+<set ShowWordTime="0">
+
+# enable or disable the random quotes
+<set ShowRandQuote="1">
+
+# enable or disable the legend of the time bars
+<set ShowLegend="1">
+
+# enable or disable the kick line
+<set ShowKickLine="1">
+
+# enable or disable the action line
+<set ShowActionLine="1">
+
+# enable or disable the shout line
+<set ShowShoutLine="1">
+
+# set how many decimals to show
+<set ShowFoulDecimals="1">
+
+# enable or disable the foul line
+<set ShowFoulLine="0">
+
+# enable or disable the violent lines
+<set ShowViolentLines="1">
+
+# enable or disable "Most used words"
+<set ShowMuw="1">
+
+# enable or disable "Most referenced nicks"
+<set ShowMrn="1">
+
+# enable or disable "Most referenced URLs"
+<set ShowMru="1">
+
+# enable or disable channel music charts
+<set ShowCharts="0">
+
+# enable or disable op statistics
+<set ShowOps="1">
+
+# enable or disable voice statistics
+<set ShowVoices="0">
+
+# enable or disable halfop statistics
+<set ShowHalfops="0">
+
+# show who changed nick most often - recommended: show who changed nick most often
+<set ShowMostNicks="1">
+
+# show stats on which gender talked most
+<set ShowActiveGenders="0">
+
+# show most used smileys - recommended: show the most used smileys
+<set ShowSmileys="1">
+
+# show channel karma - recommended: show karma (nick++ / nick--)
+<set ShowKarma="1">
+
+# show most active nicks by hour - recommended: show the most active nicks by time of
+# day
+<set ShowMostActiveByHour="1">
+
+# only count stats for top talkers, ignore less-active users
+<set ShowOnlyTop="0">
+
+# show graphs in most active nicks by hour
+<set ShowMostActiveByHourGraph="1">
+
+# enable/disable the channel overview
+<set ShowOverview="1">
+
+# enable/disable the relation map and its tables
+<set ShowRelations="1">
+
+# number of nicks on the relation map
+<set RelationNicks="30">
+
+# minimum connection strength shown as a line on the relation map
+<set RelationMinWeight="3">
+
+# enable/disable the time personalities section
+<set ShowTimePersonalities="1">
+
+# enable/disable the "who carries the channel" section
+<set ShowConcentration="1">
+
+# enable/disable the signature words section
+<set ShowSignatureWords="1">
+
+# ignore specified words - words to leave out of the word statistics
+#<set IgnoreWords="badword otherword">
+
+# Control random quote output
+<set NoIgnoredQuotes="0">
+
+# specify words considered to be bad/FoulWords language
+<set FoulWords="ass fuck bitch shit scheisse scheiße kacke arsch ficker ficken schlampe">
+
+# specify words considered to be aggressive/violent
+<set ViolentWords="slaps beats smacks">
+
+# words that keep a URL out of the URL statistics - matched anywhere in a URL, any case;
+# * = any characters, ? = one; for spam and unwanted image hosts
+#<set BadUrls="imagetwist imgur.com postimg.cc/*">
+
+# minimum numbers of letters for a random quote
+<set MinQuote="25">
+
+# maximum numbers of letters for a random quote
+<set MaxQuote="65">
+
+# minimum number of characters in an interesting word
+<set WordLength="5">
+
+# maximum allowed length of a "word" with no spaces
+<set QuoteWidth="80">
+
+# Minimum number of lines per user for some "Big Numbers" statistics
+<set BigNumbersThreshold="sqrt">
+
+# nicks to show in "Most Active Nicks"
+<set ActiveNicks="25">
+
+# nicks to show in "These didn't make it.."
+<set ActiveNicks2="30">
+
+# number of nicks to show in "Most Active Nicks By Hour"
+<set ActiveNicksByHour="10">
+
+# maximum number of nicks to show in "users with most nicknames"
+<set MostNicksHistory="5">
+
+# show nicks used in "most nicks"
+<set MostNicksVerbose="1">
+
+# maximum number of topics to show - recommended: show the last 5 topics
+<set TopicHistory="5">
+
+# maximum number of URLs to show
+<set UrlHistory="5">
+
+# number of songs to show
+<set ChartsHistory="5">
+
+# how to recognize songs played
+<set ChartsRegexp="(?:is )?(?:np:|(?:now )?playing:? |listening to:? )(?:MPEG stream from)?\s*(.*)">
+
+# maximum number of words to show
+<set WordHistory="10">
+
+# maximum number of nicks to show in "Most referenced nicks"
+<set NickHistory="5">
+
+# maximum number of smileys to show in smiley stats
+<set SmileyHistory="10">
+
+# maximum number of nicks to show in "Karma"
+<set KarmaHistory="5">
+
+# track nick changes and create aliases - recommended: follow nick changes so Alice,
+# Alice_ and Alice- count as one person
+<set NickTracking="1">
+
+# maximum number of nicks in lists
+<set NickLimit="10">
+
+# sort "most active nicks" by words
+<set SortByWords="0">
+
+# ---- Picture options -------------------------------------------------------
+
+# path to images on stats page
+<set PicLocation=".">
+
+# number of user pictures per row
+<set UserPics="1">
+
+# path to user pictures (HTML page) - folder of user pictures, as seen by the web page
+#<set ImagePath="images/">
+
+# use a default user picture - picture shown for users who have none
+#<set DefaultPic="images/nobody.png">
+
+# path to user pictures (output generation) - folder of user pictures, as seen by pisg
+# (for pic="x_*.jpg" globs)
+#<set ImageGlobPath="/var/www/pisg/images/">
+
+# define a standard width for user pictures - show every user picture this wide, in
+# pixels
+#<set PicWidth="55">
+
+# define a standard height for user pictures - show every user picture this tall, in
+# pixels
+#<set PicHeight="55">
+
+# ---- Misc options ----------------------------------------------------------
+
+# character set to use for stats page - recommended: UTF-8 shows accents, emoji and non-
+# Latin scripts correctly
+<set Charset="utf-8">
+
+# character set for logfiles - convert logs from this charset (needs the Text::Iconv
+# perl module)
+#<set LogCharset="iso-8859-1">
+
+# fallback character set for logfiles - used for lines that are not valid in LogCharset
+# (needs Text::Iconv)
+#<set LogCharsetFallback="iso-8859-1">
+
+# use a different time zone than the local machine
+<set TimeOffset="+0">
+
+# use regular expressions in user aliases
+<set RegexpAliases="0">
+
+# filename of language file
+<set LangFile="lang.txt">
+
+# path to directory with CSS files
+<set CssDir="layout/">
+
+# colors for color gradient in most active nicks section
+<set HiCell="#BABADD">
+<set HiCell2="#CCCCCC">
+
+# colors for color gradient in most active nicks section
+<set HiCell2="#CCCCCC">
+
+# dump raw statistics into file - debugging: dump the raw statistics to this file
+#<set StatsDump="stats.dump">
+
+# ---- Advanced (not in the original documentation) -------------------------
+
+# nicks of bots, for log formats that cannot tell bots from people (DCpp)
+#<set BotNicks="bot1 bot2">
+
+# width in pixels of the statistics tables
+<set TableWidth="574">
+
+# image id of the horizontal bar for hours 0-5
+<set Pic_H_0="blue-h">
+
+# image id of the horizontal bar for hours 6-11
+<set Pic_H_6="green-h">
+
+# image id of the horizontal bar for hours 12-17
+<set Pic_H_12="yellow-h">
+
+# image id of the horizontal bar for hours 18-23
+<set Pic_H_18="red-h">
+
+# image id of the vertical bar for hours 0-5
+<set Pic_V_0="blue-v">
+
+# image id of the vertical bar for hours 6-11
+<set Pic_V_6="green-v">
+
+# image id of the vertical bar for hours 12-17
+<set Pic_V_12="yellow-v">
+
+# image id of the vertical bar for hours 18-23
+<set Pic_V_18="red-v">
+
+
+##############################################################################
+#  YOUR CHANNEL - copy this block for each extra channel
+##############################################################################
+
+<channel="#example">
+  # Logfile: the log to read; you can list several Logfile lines  EDIT
+  Logfile="/path/to/example.log"
+
+  # LogDir: use INSTEAD of Logfile to read a whole folder of dated logs
+  #LogDir="/path/to/logs/"
+
+  # LogPrefix: with LogDir: only read files starting with this
+  #LogPrefix="example.log."
+
+  # LogSuffix: with LogDir: date format at the end of the file names, so they sort by
+  # date
+  #LogSuffix=".%d%b%Y"
+
+  # NFiles: with LogDir: only parse the newest N files (0 = all)
+  #NFiles="30"
+
+  # Format: your log format: eggdrop, mIRC, xchat, irssi, ... (see docs/FORMATS)  EDIT
+  Format="eggdrop"
+
+  # Network: the IRC network, shown on the page  EDIT
+  Network="ExampleNet"
+
+  # OutputFile: the page pisg writes  EDIT
+  OutputFile="/var/www/html/example.html"
+
+  # OutputTag: replaces %t in OutputFile; used with the -nf / -t command line options
+  #OutputTag="-week"
+
+  # Maintainer: who is named as maintainer on the page  EDIT
+  Maintainer="Your Name"
+
+  # LogType: only "Logfile" exists, leave it
+  LogType="Logfile"
+
+  # Any global option can be overridden for this channel only, for example:
+  #Lang="FR"
+  #ColorScheme="midnight"
+</channel>
+
+
+##############################################################################
+#  USERS - link nicks together, add pictures, mark bots
+##############################################################################
+# nick    the name shown in the stats (required)
+# alias   other nicks of the same person, space separated; * matches anything
+#         (Joe* also counts Joe_, Joe^away ...). NickTracking="1" also finds many
+# pic     picture shown next to the user      bigpic  larger picture it links to
+# link    a web address or e-mail address      sex     m, f or b (bot)
+# ignore  y = leave this nick out of the stats altogether (for bots)
+
+<user nick="Alice" alias="Alice_ Alice-* AliceAway" pic="alice.png" link="https://example.com/alice" sex="f">
+<user nick="Bob" alias="Bob_ Bobby" pic="bob.png" bigpic="bob-big.png" link="bob@example.com" sex="m">
+<user nick="ChanBot" sex="b" ignore="y">
+
+##############################################################################
+#  LINKS - keep addresses out of "Most referenced URLs"
+##############################################################################
+<link url="https://example.com/spam" ignore="y">
+
+##############################################################################
+#  INCLUDE - share users between channels or config files
+##############################################################################
+# Put your <user> lines in users.cfg and load them here (an included file cannot
+# include another file):
+#<include="users.cfg">

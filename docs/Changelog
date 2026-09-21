@@ -1,3 +1,79 @@
+pisg (1.0.a) - Mon Sep, 21st 2026
+    The "Modern Look" Release.
+    pisg maintainers:
+    * Guided setup: run "perl setup.pl". It looks for logs already on the
+      computer (eggdrop, ZNC, irssi, WeeChat, HexChat, mIRC, AdiIRC), asks a few
+      questions, writes pisg.cfg, makes the first page, offers to run pisg on a
+      schedule (cron, or a Windows scheduled task) and lists free places to
+      host the pages. It never overwrites an existing pisg.cfg.
+    * New look: five modern themes (modern, midnight, amoled, terminal,
+      canada), generated from one stylesheet by layout/build-themes.py. The
+      old themes are unchanged. Ink on paper with colour reserved for data:
+      four time-of-day colours checked for colour-blind safety in light and
+      dark, nicks and figures in monospace, sections separated by a rule
+      instead of boxes, bars standing on one baseline. Scales from phones to
+      wide screens.
+    * Section navigation (ShowNavBar): on wide screens a menu down the left
+      side with the section being read marked, and the page uses the full width
+      with short sections side by side; on narrow screens a slim bar with a
+      "Sections" menu listing every section at once. No sideways scrolling, and
+      it works without JavaScript.
+    * New sections: channel overview (ShowOverview), relation map, closest pairs
+      and social roles (ShowRelations, RelationNicks, RelationMinWeight),
+      time personalities (ShowTimePersonalities), who carries the channel
+      (ShowConcentration) and signature words (ShowSignatureWords).
+      The relation map is interactive (click a nick or a line for details) and
+      spreads its nicks evenly instead of drawing them to scale.
+      Bots (sex="b" or ignore="y") are left off it. English and French texts.
+    * Landing page: site/index.html is a static page (no PHP, no libraries, works
+      on GitHub Pages) with the statistics of the statistics: a headline and facts
+      for all channels, one row per channel to compare them (share of lines,
+      busiest hour, a 24-hour profile, the last 30 days, top talker) with a "View
+      stats" button, and the busiest people of each channel. It reads
+      channels.json, which pisg writes next to its pages (option ChannelIndex).
+    * New option HomeLink: an "All channels" button at the top of every stats page
+      that leads back to the landing page.
+    * New option BadUrls: URLs containing a listed word are left out of the URL
+      statistics. Understands the wildcards * and ?.
+    * Several channels in one run: a channel that cannot be read (missing log
+      folder, wrong format) is skipped with a message ("Skipped channel #name:
+      reason") and the others are still made; pisg exits with status 1 so cron
+      or monitoring notices.
+    * New pisg.cfg.example listing every option with what it does, and
+      docs/pisg-doc.html, the documentation as one web page that includes it.
+      docs/gen-example-config.py and docs/xml2html.py rebuild both.
+    * scripts/adiirc2eggdrop.py converts an AdiIRC channel log to eggdrop or
+      ZNC log format (--format znc), public events only, local time to UTC, so
+      old logs can be added to the stats. It never overwrites a file.
+    * scripts/znc-setup.sh puts converted logs into a ZNC account's log folder
+      and lets pisg, running as another unix user, read only those channel
+      folders. It shows what it would do before it changes anything.
+    * Profiles people edit themselves: scripts/eggdrop-pisg.tcl adds !pisghelp,
+      !pisginfo (sex, picture, link), !pisgmerge / !pisgunmerge (count their other
+      nicks as one), !pisgshow, !pisgdel and, for bot masters, !pisgdeluser. Each
+      also works in a private message. The bot identifies people by their
+      services account, only lets them claim the nick they are using, and writes
+      users.cfg, which pisg reads with <include="users.cfg">. Your own settings go
+      in pisg.local.tcl next to the script. Test suite: scripts/eggdrop-pisg-test.tcl.
+    * scripts/pisg-autoalias.py merges nicks that used the same authenticated
+      account host (on Undernet *.users.undernet.org). It writes a file for pisg
+      to include; your own <user> lines always win. It has its own tests.
+    * eggdrop-pisg.tcl: !pisgstats is open to everybody, gives the right address
+      and no longer runs pisg inside the bot; the broken timer (it posted to a nick
+      called "gchan" and ran pisg a second time) is off by default.
+    Fixes:
+    * A page is now written to a temporary file and moved into place only when
+      it is complete, so an error can no longer leave a half-written page. pisg
+      now exits with status 1 when it fails (it used to exit 0).
+    * Long quotes are shortened on a character boundary, so UTF-8 text is no
+      longer cut in half.
+    * A section that fails is skipped with a warning instead of stopping pisg.
+    * An error in one channel no longer leaks its nick aliases into the next.
+    * "Most used words" no longer lists punctuation or ASCII art as words.
+    * Tables share one left edge; column titles and "3 days ago" stay on one
+      line; the default user picture is shown as a small faded placeholder; no
+      useless sideways scrollbars in the sections (checked from 360 to 1280 px).
+
 pisg (0.73) - Wed Jan, 18th 2012
     The "Long Awaited" Release.
     HM2K:

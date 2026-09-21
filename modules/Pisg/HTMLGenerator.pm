@@ -6,6 +6,8 @@ package Pisg::HTMLGenerator;
 # found at the end of the file.
 
 use strict;
+use Encode ();
+use Pisg::Insights;
 $^W = 1;
 
 # test for Text::Iconv
@@ -33,7 +35,27 @@ sub new
     return $self;
 }
 
+# The page is written to a temporary file and moved into place only when it is complete,
+# so an error part-way through can never leave a half-written page where the good one was.
 sub create_output
+{
+    my ($self, $lang) = @_;
+    my $ok = eval { $self->_create_output_inner($lang); 1 };
+    my $err = $@;
+    my ($tmp, $final) = @{$self}{qw(outfile_tmp outfile_final)};
+    close(OUTPUT);
+    if (defined $tmp and -e $tmp) {
+        if ($ok) {
+            rename($tmp, $final) or do { unlink($tmp); die("$0: Unable to write $final: $!\n"); };
+        } else {
+            unlink($tmp);
+        }
+    }
+    delete @{$self}{qw(outfile_tmp outfile_final)};
+    die $err unless $ok;
+}
+
+sub _create_output_inner
 {
     # This subroutine calls all the subroutines which create their
     # individual stats. The name of the functions is somewhat saying - if
@@ -72,7 +94,9 @@ sub create_output
     print "Now generating HTML ($self->{cfg}->{lang}) in $fname...\n"
         unless ($self->{cfg}->{silent});
 
-    open (OUTPUT, "> $fname") or
+    $self->{outfile_final} = $fname;
+    $self->{outfile_tmp} = "$fname.tmp$$";
+    open (OUTPUT, "> $self->{outfile_tmp}") or
         die("$0: Unable to open outputfile($fname): $!\n");
 
     if ($self->{cfg}->{showlines}) {
@@ -100,9 +124,14 @@ sub create_output
         $self->{cfg}->{tablewidth} += $self->{cfg}->{userpics} * ($self->{cfg}->{picwidth} || 60);
     }
     $self->{cfg}->{headwidth} = $self->{cfg}->{tablewidth} - 4;
+    $self->{card_open} = 0;
+    $self->{nav} = [];
+    $self->{ins_script_relmap} = 0;
     $self->_htmlheader();
     $self->_pageheader()
         if ($self->{cfg}->{pagehead} ne 'none');
+
+    $self->_ins_safe('_insights_overview') if $self->{cfg}->{showoverview};
 
     if ($self->{cfg}->{dailyactivity}) {
         $self->_activedays();
@@ -116,12 +145,18 @@ sub create_output
         $self->_activenicks();
     }
 
+    $self->_ins_safe('_insights_relations') if $self->{cfg}->{showrelations};
+
     if ($self->{cfg}->{showmostactivebyhour}) {
         $self->_mostactivebyhour();
     }
 
+    $self->_ins_safe('_insights_personalities') if $self->{cfg}->{showtimepersonalities};
+    $self->_ins_safe('_insights_concentration') if $self->{cfg}->{showconcentration};
+    $self->_ins_safe('_insights_signature') if $self->{cfg}->{showsignaturewords};
+
     if ($self->{cfg}->{showbignumbers}) {
-        $self->_headline($self->_template_text('bignumtopic'));
+        $self->_headline($self->_template_text('bignumtopic'), undef, undef, 'bignumtopic');
         _html("<table width=\"$self->{cfg}->{tablewidth}\">"); # Needed for sections
         $self->_questions();
         $self->_shoutpeople();
@@ -168,7 +203,7 @@ sub create_output
     }
 
     if ($self->{cfg}->{showbignumbers}) {
-        $self->_headline($self->_template_text('othernumtopic'));
+        $self->_headline($self->_template_text('othernumtopic'), undef, undef, 'othernumtopic');
         _html("<table width=\"$self->{cfg}->{tablewidth}\">"); # Needed for sections
         $self->_gotkicks();
         $self->_mostkicks();
@@ -183,13 +218,17 @@ sub create_output
     }
 
     if ($self->{cfg}->{showtopics}) {
-        $self->_headline($self->_template_text('latesttopic'));
+        $self->_headline($self->_template_text('latesttopic'), undef, undef, 'latesttopic');
         _html("<table width=\"$self->{cfg}->{tablewidth}\">"); # Needed for sections
 
         $self->_lasttopics();
 
         _html("</table>"); # Needed for sections
     }
+
+    _html('</div>') if $self->{card_open};
+    $self->{card_open} = 0;
+    $self->_insights_scripts();
 
     my %hash = ( lines => $self->{stats}->{parsedlines} );
     _html('<div id="totallines">' . $self->_template_text('totallines', %hash) . '</div>');
@@ -201,8 +240,98 @@ sub create_output
 
     close(OUTPUT);
 
+    $self->_insert_navbar();
+    $self->_update_channel_index();
+
     # restore tablewidth
     $self->{cfg}->{tablewidth} = $tablewidth_original;
+}
+
+# Keep a small JSON list of the channels found in the output directory, so a
+# landing page can offer a channel dropdown straight from pisg's own knowledge
+# (no scanning or scraping of the generated HTML). Each run updates only this
+# channel's entry, so running channels one at a time works too. Disable with
+# ChannelIndex="none".
+sub _update_channel_index
+{
+    my $self = shift;
+    my $name = $self->{cfg}->{channelindex};
+    return if !defined $name or $name eq '' or lc($name) eq 'none';
+    return unless eval { require JSON::PP; 1 };
+
+    my $out = $self->{outfile_final} || $self->{cfg}->{outputfile};
+    my ($dir, $file) = $out =~ m{^(.*)/([^/]+)$} ? ($1, $2) : ('.', $out);
+    $dir = '/' if $dir eq '';
+    my $path = "$dir/$name";
+    # No utf8 layer: names come from the config as bytes and go back out as bytes.
+    my $json = JSON::PP->new->canonical->pretty;
+
+    my @channels;
+    if (open(my $in, '<', $path)) {
+        local $/;
+        my $data = <$in>;
+        close($in);
+        my $old = eval { $json->decode($data) };
+        @channels = @{ $old->{channels} }
+            if ref $old eq 'HASH' and ref $old->{channels} eq 'ARRAY';
+    }
+    # Replace this channel's entry; forget pages that no longer exist.
+    @channels = grep { ref $_ eq 'HASH' and defined $_->{file}
+                       and $_->{file} ne $file and -e "$dir/$_->{file}" } @channels;
+
+    my @t = gmtime();
+    push @channels, {
+        name    => $self->{cfg}->{channel},
+        file    => $file,
+        network => $self->{cfg}->{network},
+        updated => sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]),
+        days    => 0 + ($self->{stats}->{days} || 0),
+        nicks   => 0 + scalar(keys %{ $self->{stats}->{lines} || {} }),
+        lines   => 0 + ($self->{stats}->{parsedlines} || 0),
+        %{ $self->_channel_index_extras },
+    };
+    @channels = sort { lc($a->{name}) cmp lc($b->{name}) } @channels;
+
+    my $tmp = "$path.tmp$$";
+    if (open(my $fh, '>', $tmp)) {
+        print $fh $json->encode({ version => 1, channels => \@channels });
+        close($fh);
+        rename($tmp, $path) or unlink($tmp);
+    } else {
+        print STDERR "Warning: cannot write channel index $path: $!\n" unless $self->{cfg}->{silent};
+    }
+}
+
+# A few numbers per channel for the landing page, which shows the statistics of the statistics:
+# what the channel is busy with hour by hour, how the last weeks went, who talks most.
+sub _channel_index_extras
+{
+    my $self = shift;
+    my $st = $self->{stats};
+    my %x;
+    my $sum = sub { my $t = 0; $t += $_ for values %{ $_[0] || {} }; return $t; };
+    $x{words}     = 0 + $sum->($st->{words});
+    $x{questions} = 0 + $sum->($st->{questions});
+    $x{joins}     = 0 + $sum->($st->{joins});
+    $x{links}     = 0 + $sum->($st->{urlcounts});
+    $x{hours}     = [ map { 0 + ($st->{times}{ sprintf('%02d', $_) } || 0) } 0 .. 23 ];
+
+    # Lines on each of the last 30 days of the log (days are counted as pisg counts them everywhere).
+    my $dl = $st->{day_lines} || [];
+    my $last = $#$dl;
+    my $first = $last - 29; $first = 1 if $first < 1;
+    $x{recent} = [ map { 0 + ($dl->[$_] || 0) } $first .. $last ] if $last >= 1;
+
+    # Top talkers, bots left out. Names go out as valid UTF-8 whatever the log's charset was.
+    my @top;
+    my $humans = eval { $self->_ins_humans } || [];
+    for my $n (@$humans[0 .. ($#$humans > 4 ? 4 : $#$humans)]) {
+        next unless defined $n;
+        my $clean = Encode::encode('UTF-8', Encode::decode('UTF-8', $n, Encode::FB_DEFAULT | Encode::LEAVE_SRC));
+        push @top, { nick => $clean, lines => 0 + ($st->{lines}{$n} || 0) };
+    }
+    $x{top} = \@top;
+    return \%x;
 }
 
 sub _htmlheader
@@ -238,6 +367,13 @@ sub _htmlheader
         }
     }
 
+    # Styles for the newer sections, so any theme (even a 2003 one) shows them decently;
+    # a theme that styles them comes later and wins.
+    if ($self->{cfg}->{colorscheme} ne "none") {
+        my $base = $self->_ins_basecss;
+        $CSS = "<style type=\"text/css\" id=\"pisg-base\">\n$base</style>\n" . $CSS if length $base;
+    }
+
     my $title = $self->_template_text('pagetitle1', %hash);
     if($self->{cfg}->{colorscheme} ne "none") {
         _html( <<HTML );
@@ -245,6 +381,7 @@ sub _htmlheader
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=$self->{cfg}->{charset}" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>$title</title>
 $CSS
 </head>
@@ -252,9 +389,16 @@ $CSS
 <div align="center">
 HTML
     }
+    # Optional way back to the landing page (option HomeLink): a relative page or an http(s) address.
+    my $home = $self->{cfg}->{homelink};
+    if (defined $home and $home =~ m{^(?:[\w.\-/]+|https?://[^\s"'<>]+)$} and lc($home) ne 'none' and $self->{cfg}->{colorscheme} ne 'none') {
+        _html('<p class="homebar"><a class="homebtn" id="homebtn" href="' . $home . '"><span aria-hidden="true">&larr;</span> '
+              . $self->_template_text('home_label') . '</a></p>');
+    }
     _html('<h1 class="title" id="pagetitle1">' . $title . '</h1>');
     _html('<p class="subtitle"><span id="pagetitle2">' . $self->_template_text('pagetitle2', %hash) . ' ' . $self->get_time() . '</span><br />');
     _html('<span id="pagetitle3">' . $self->_template_text('pagetitle3', %hash) . '</span></p>');
+    $self->_nav_marker;
 
 }
 
@@ -354,7 +498,14 @@ HTML
 sub _headline
 {
     my $self = shift;
-    my ($title) = (@_);
+    my ($title, $id, $label, $key) = (@_);
+    # Wrap each section in a <div class="card"> so themes can box sections up.
+    # Themes that don't style .card render exactly as before. The id is what the
+    # navbar links to.
+    $id = $self->_nav_register($title, $id, $label);
+    _html('</div>') if $self->{card_open};
+    _html('<div class="card' . ($self->_card_is_half($key) ? ' half' : '') . '" id="' . $id . '">');
+    $self->{card_open} = 1;
     _html( <<HTML );
    <br />
    <table width="$self->{cfg}->{headwidth}" cellpadding="1" cellspacing="0" border="0">
@@ -422,21 +573,23 @@ sub _activedays
     my %hash = (
         n => $ndays
     );
-    $self->_headline($self->_template_text('dailyactivitytopic', %hash));
+    $self->_headline($self->_template_text('dailyactivitytopic', %hash), undef, undef, 'dailyactivitytopic');
 
     _html("<table border=\"0\"><tr>");
 
+    my $peak_done = 0;
     for (my $day = $days - $ndays + 1; $day <= $days ; $day++) {
         my $lines = $self->{stats}->{day_lines}[$day];
-        _html("<td align=\"center\" valign=\"bottom\" class=\"asmall\">$lines<br />");
+        my $pk = ($lines == $highest_value && !$peak_done++) ? ' pk' : '';   # only the busiest day keeps its number
+        _html("<td align=\"center\" valign=\"bottom\" class=\"asmall\"><span class=\"v$pk\">$lines</span><br />");
         for (my $time = 4; $time >= 0; $time--) {
             if (defined($self->{stats}->{day_times}[$day][$time])) {
-                my $size = int(($self->{stats}->{day_times}[$day][$time] / $highest_value) * 100);
+                my $size = int(($self->{stats}->{day_times}[$day][$time] / $highest_value) * 130);
 
                 my $image = "pic_v_".$time*6;
                 $image = $self->{cfg}->{$image};
                 _html("<img id=\"$image\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=
-\" width=\"15\" height=\"$size\" alt=\"$size\" title=\"$size\" /><br />") if $size;
+\" width=\"15\" height=\"$size\" alt=\"$self->{stats}->{day_times}[$day][$time]\" title=\"$self->{stats}->{day_times}[$day][$time]\" /><br />") if $size;
 
             }
         }
@@ -446,7 +599,8 @@ sub _activedays
     _html("</tr><tr>");
 
     for (my $day = $ndays - 1; $day >= 0 ; $day--) {
-        _html("<td class=\"rankc10center\" align=\"center\">$day</td>");
+        my $skip = ($day % 5 == 0) ? '' : ' skip';                   # label every 5th day only
+        _html("<td class=\"rankc10center$skip\" align=\"center\">$day</td>");
     }
 
     _html("</tr></table>");
@@ -463,22 +617,24 @@ sub _activetimes
 
     my (%output);
 
-    $self->_headline($self->_template_text('activetimestopic'));
+    $self->_headline($self->_template_text('activetimestopic'), undef, undef, 'activetimestopic');
 
     my @toptime = sort { $self->{stats}->{times}{$b} <=> $self->{stats}->{times}{$a} } keys %{ $self->{stats}->{times} };
 
     my $highest_value = $self->{stats}->{times}{$toptime[0]};
 
+    my $peak_done = 0;
     for my $hour (sort keys %{ $self->{stats}->{times} }) {
 
-        my $size = int(($self->{stats}->{times}{$hour} / $highest_value) * 100);
+        my $size = int(($self->{stats}->{times}{$hour} / $highest_value) * 110);
         my $percent = sprintf("%.1f", ($self->{stats}->{times}{$hour} / $self->{stats}->{parsedlines}) * 100);
         my $lines_per_hour = $self->{stats}->{times}{$hour};
+        my $pk = ($lines_per_hour == $highest_value && !$peak_done++) ? ' pk' : '';   # only the peak hour keeps its label
 
         my $image = "pic_v_".(int($hour/6)*6);
         $image = $self->{cfg}->{$image};
 
-        $output{$hour} = "<td align=\"center\" valign=\"bottom\" class=\"asmall\">$percent%<br /><img id=\"$image\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=
+        $output{$hour} = "<td align=\"center\" valign=\"bottom\" class=\"asmall\"><span class=\"v$pk\">$percent%</span><br /><img id=\"$image\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=
 \" width=\"15\" height=\"$size\" alt=\"$lines_per_hour\" title=\"$lines_per_hour\"/></td>" if $size;
     }
 
@@ -488,7 +644,7 @@ sub _activetimes
         $a = sprintf("%02d", $b);
 
         if (!defined($output{$a})) {
-            _html("<td align=\"center\" valign=\"bottom\" class=\"asmall\">0%</td>");
+            _html("<td align=\"center\" valign=\"bottom\" class=\"asmall\"><span class=\"v\">0%</span></td>");
         } else {
             _html($output{$a});
         }
@@ -502,7 +658,7 @@ sub _activetimes
     for ($b = 0; $b < 24; $b++) {
         # Highlight the top time
         my $class = $toptime[0] == $b ? 'hirankc10center' : 'rankc10center';
-        _html("<td class=\"$class\" align=\"center\">$b</td>");
+        _html("<td class=\"$class hr\" align=\"center\">$b</td>");
     }
 
     _html("</tr></table>");
@@ -517,7 +673,7 @@ sub _activenicks
     # The most active nicks (those who wrote most lines)
     my $self = shift;
 
-    $self->_headline($self->_template_text('activenickstopic'));
+    $self->_headline($self->_template_text('activenickstopic'), undef, undef, 'activenickstopic');
 
     my $output = "";
     $output .= "<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>";
@@ -652,8 +808,8 @@ sub _activenicks
         
         $output .= "<td $style>" . sprintf("%.1f", $w/$line) . "</td>"  if ($self->{cfg}->{showwpl});
         $output .= "<td $style>" . sprintf("%.1f", $ch/$line) . "</td>" if ($self->{cfg}->{showcpl});
-        $output .= "<td $style>$lastseen</td>"                          if ($self->{cfg}->{showlastseen});
-        $output .= "<td $style>\"$randomline\"</td>"                    if ($self->{cfg}->{showrandquote});
+        $output .= "<td $style class=\"lastseen\">$lastseen</td>"        if ($self->{cfg}->{showlastseen});
+        $output .= "<td $style class=\"quote\">\"$randomline\"</td>"      if ($self->{cfg}->{showrandquote});
 
         _html($output);
         undef $output;
@@ -1756,6 +1912,7 @@ sub _mostusedword
         # Skip people's nicks.
         next if is_nick($word, $self->{cfg}->{cachedir});
         next if (length($word) < $self->{cfg}->{wordlength});
+        next unless $self->_has_letters($word);          # ASCII art and punctuation are not words
         $usages{$word} = $self->{stats}->{wordcounts}{$word};
     }
 
@@ -1763,7 +1920,7 @@ sub _mostusedword
     my @popular = sort { $usages{$b} <=> $usages{$a} } keys %usages;
 
     if (@popular) {
-        $self->_headline($self->_template_text('mostwordstopic'));
+        $self->_headline($self->_template_text('mostwordstopic'), undef, undef, 'mostwordstopic');
 
         _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
         _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('word') . "</b></td>");
@@ -1856,7 +2013,7 @@ sub _mostreferencednicks
 
     if (@popular) {
 
-        $self->_headline($self->_template_text('referencetopic'));
+        $self->_headline($self->_template_text('referencetopic'), undef, undef, 'referencetopic');
 
         _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
         _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('nick') . "</b></td>");
@@ -1899,7 +2056,7 @@ sub _smileys
     my @popular = sort { $usages{$b} <=> $usages{$a} } keys %usages;
     return unless @popular;
 
-    $self->_headline($self->_template_text('smileytopic'));
+    $self->_headline($self->_template_text('smileytopic'), undef, undef, 'smileytopic');
 
     _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
     _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('smiley') . "</b></td>");
@@ -1940,7 +2097,7 @@ sub _karma
     my @popular = sort { $karma{$b} <=> $karma{$a} } keys %karma;
     return unless @popular;
 
-    $self->_headline($self->_template_text('karmatopic'));
+    $self->_headline($self->_template_text('karmatopic'), undef, undef, 'karmatopic');
 
     _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
     _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('nick') . "</b></td>");
@@ -2017,7 +2174,7 @@ sub _mosturls
 
     if (@sorturls) {
 
-        $self->_headline($self->_template_text('urlstopic'));
+        $self->_headline($self->_template_text('urlstopic'), undef, undef, 'urlstopic');
 
         _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
         _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('url') . "</b></td>");
@@ -2056,7 +2213,7 @@ sub _charts
 
     if (@sortcharts) {
 
-        $self->_headline($self->_template_text('chartstopic'));
+        $self->_headline($self->_template_text('chartstopic'), undef, undef, 'chartstopic');
 
         _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
         _html("<td>&nbsp;</td><td class=\"tdtop\"><b>" . $self->_template_text('song') . "</b></td>");
@@ -2241,7 +2398,8 @@ sub _user_pic
     my $width = $self->{cfg}->{picwidth} ? " width=\"$self->{cfg}->{picwidth}\"" : "";
     my $alt = $self->{users}->{userpics}{$nick} ? " alt=\"$nick\" title=\"$nick\"" : ' alt=""';
     my $border = $biguserpic ? ' border="0"' : '';
-    $output .= "<img src=\"$pic\"$width$height$alt$border />";
+    my $cls = $self->{users}->{userpics}{$nick} ? '' : ' class="defpic"';      # the shared default picture, so themes can tone it down
+    $output .= "<img src=\"$pic\"$cls$width$height$alt$border />";
 
     $output .= "</a>" if $biguserpic;
     _html("$output</td>");
@@ -2257,7 +2415,7 @@ sub _mostnicks
 
     if (keys %{ $self->{stats}->{nicks}->{$sortnicks[0]} } > 1) {
 
-        $self->_headline($self->_template_text('mostnickstopic'));
+        $self->_headline($self->_template_text('mostnickstopic'), undef, undef, 'mostnickstopic');
 
         my $names1 = $self->_template_text('names1');
         my $names2 = $self->_template_text('names2');
@@ -2341,7 +2499,7 @@ sub _mostactivebyhour
 
     if ($lastline>=0) {
 
-        $self->_headline($self->_template_text('activenickbyhourtopic'));
+        $self->_headline($self->_template_text('activenickbyhourtopic'), undef, undef, 'activenickbyhourtopic');
 
         _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
         _html("<td>&nbsp;</td>");
@@ -2447,7 +2605,7 @@ sub _activegenders {
 
     return unless @topgender;
 
-    $self->_headline($self->_template_text('activegenderstopic'));
+    $self->_headline($self->_template_text('activegenderstopic'), undef, undef, 'activegenderstopic');
     _html("<table border=\"0\" width=\"$self->{cfg}->{tablewidth}\"><tr>");
     _html(" <td>&nbsp;</td>"
     . "<td class=\"tdtop\"><b>" . $self->_template_text('gender') . "</b></td>"

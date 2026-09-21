@@ -4,6 +4,7 @@ package Pisg::Parser::Logfile;
 # found at the end of the file.
 
 use strict;
+use Encode ();
 use Storable;
 
 $^W = 1;
@@ -58,6 +59,17 @@ sub new
     # precompile the regexps used (we can't use /o since the config might be different per channel)
     $self->{foulwords_regexp} = qr/($self->{cfg}->{foulwords})/i if $self->{cfg}->{foulwords};
     $self->{ignorewords_regexp} = qr/$self->{cfg}->{ignorewords}/i if $self->{cfg}->{ignorewords};
+    # BadUrls: a URL containing any of these words (case-insensitive, anywhere in the
+    # URL) is left out of the URL statistics. Everything is literal text except the
+    # wildcards * (any characters) and ? (one character), so it is not a regexp.
+    my @badurls = grep { length } split(/\s+/, $self->{cfg}->{badurls} || '');
+    if (@badurls) {
+        my $alt = join '|', map { my $w = quotemeta; $w =~ s/\\\*/.*/g; $w =~ s/\\\?/./g; $w } @badurls;
+        $self->{badurls_regexp} = qr/$alt/i;
+    }
+    # Who talks to whom (relation map, best friends, signature words) needs extra data per
+    # line. Only collect it when one of those sections is switched on.
+    $self->{rel_on} = ($self->{cfg}->{showrelations} || $self->{cfg}->{showsignaturewords}) ? 1 : 0;
     $self->{violentwords_regexp} = qr/^($self->{cfg}->{violentwords}) (\S+)(.*)/i if $self->{cfg}->{violentwords};
     $self->{chartsregexp} = qr/^$self->{cfg}->{chartsregexp}/i if $self->{cfg}->{chartsregexp};
 
@@ -173,6 +185,7 @@ sub analyze
 
     $self->_pick_random_lines(\%stats, \%lines);
     _uniquify_nicks(\%stats);
+    $self->_resolve_relations(\%stats) if $self->{rel_on};
 
     my ($sec,$min,$hour) = gmtime(time() - $starttime);
     my $processtime = sprintf('%02d hours, %02d minutes and %02d seconds', $hour, $min, $sec);
@@ -283,6 +296,21 @@ sub _parse_dir
 }
 
 # This parses the file...
+# substr() cuts at a byte offset, which can split a multi-byte UTF-8 character in
+# two and leave invalid UTF-8 in the page. For UTF-8 output, back up to a
+# character boundary; for other charsets this is a plain substr().
+sub _truncate
+{
+    my ($self, $text, $len) = @_;
+    my $t = substr($text, 0, $len);
+    if ($self->{cfg}->{charset} =~ /^utf-?8$/i and $t =~ /([\xC0-\xFF])([\x80-\xBF]*)\z/) {
+        my ($lead, $have) = (ord($1), length($2));
+        my $need = $lead >= 0xF0 ? 3 : $lead >= 0xE0 ? 2 : 1;
+        $t = substr($t, 0, length($t) - 1 - $have) if $have < $need;
+    }
+    return $t;
+}
+
 sub _parse_file
 {
     my $self = shift;
@@ -375,6 +403,24 @@ sub _parse_file
                     }
                     $stats->{lastnick} = $nick;
 
+                    if ($self->{rel_on}) {
+                        # Turn taking: this nick spoke right after another one.
+                        my $prev = $stats->{rel_lastnick};
+                        $stats->{rel_turns}{$prev}{$nick}++ if defined $prev and $prev ne '' and $prev ne $nick;
+                        $stats->{rel_lastnick} = $nick;
+
+                        # "nick: text" / "nick, text" talks to that nick (checked against real nicks later).
+                        if ($saying =~ /^\s*[\@+%~&]?([\w\[\]\\`^{|}\x80-\xFF-]{2,30})\s*[:,]/) {
+                            $stats->{rel_direct}{$nick}{lc $1}++;
+                        }
+                        # Every word (links removed), to find nicks mentioned and words a nick favours.
+                        (my $plain = $saying) =~ s{\S+://\S+|\bwww\.\S+}{ }gi;
+                        foreach my $w ($plain =~ /([\w\[\]\\`^{|}\x80-\xFF-]{2,30})/g) {   # bytes >= 0x80 keep UTF-8 letters whole
+                            next if $w =~ /^\d+$/;
+                            $stats->{rel_words}{$nick}{lc $w}++;
+                        }
+                    }
+
                     my $len = length($saying);
                     if ($len > $self->{cfg}->{minquote} && $len < $self->{cfg}->{maxquote}) {
                         push @{ $lines->{sayings}{$nick} }, $saying;
@@ -382,7 +428,7 @@ sub _parse_file
                         # Just fill the users first saying in if he hasn't
                         # said anything yet, to get rid of empty quotes.
                         if ($len > $self->{cfg}->{maxquote} - 3) {
-                            push @{ $lines->{sayings}{$nick} }, substr($saying, 0, $self->{cfg}->{maxquote} - 3) . '...';
+                            push @{ $lines->{sayings}{$nick} }, $self->_truncate($saying, $self->{cfg}->{maxquote} - 3) . '...';
                         } else {
                             push @{ $lines->{sayings}{$nick} }, $saying;
                         }
@@ -438,7 +484,7 @@ sub _parse_file
                     # Find URLs
                     if (my @urls = match_urls($saying)) {
                         foreach my $url (@urls) {
-                            if(!url_is_ignored($url)) {
+                            if(!url_is_ignored($url) and !($self->{badurls_regexp} and $url =~ $self->{badurls_regexp})) {
                                 $stats->{urlcounts}{$url}++;
                                 $stats->{urlnicks}{$url} = $nick;
                             }
@@ -735,6 +781,97 @@ sub _random_line
     return $out || $out2;
 }
 
+# Turn the raw per-line data into who-talks-to-whom, once every nick is known (a nick
+# can be mentioned before it ever speaks).
+#   $stats->{relations}{$from}{$to} = [direct, mentions, replies]
+#     direct   - lines that start "to: ..." or "to, ..."
+#     mentions - other times "to" (or an alias) appears in a line
+#     replies  - times "to" spoke right after "from"
+#   $stats->{signature}{$nick} = [word, uses, share]   the word a nick owns most
+sub _resolve_relations
+{
+    my ($self, $stats) = @_;
+    my %canon;
+    my $resolve = sub {
+        my $tok = shift;
+        return $canon{$tok} if exists $canon{$tok};
+        my $n = is_nick($tok);
+        return $canon{$tok} = ($n and exists $stats->{lines}{$n} and !is_ignored($n)) ? $n : '';
+    };
+
+    # The channel's own name ("canada" in #Canada) is said all the time and is not a nick.
+    (my $chanword = lc($self->{cfg}->{channel} || '')) =~ s/^#+//;
+
+    my (%rel, %mentioned);
+    foreach my $from (keys %{ $stats->{rel_words} || {} }) {
+        next if is_ignored($from);
+        my $direct = $stats->{rel_direct}{$from} || {};
+        foreach my $tok (keys %{ $stats->{rel_words}{$from} }) {
+            my $to = $resolve->($tok) or next;
+            next if $to eq $from;
+            my $d = $direct->{$tok} || 0;
+            my $m = $stats->{rel_words}{$from}{$tok} - $d;
+            $m = 0 if $m < 0 or length($tok) < 3 or $tok eq $chanword;   # 1-2 letter nicks are too often ordinary words
+            $rel{$from}{$to}[0] += $d;
+            $rel{$from}{$to}[1] += $m;
+            $mentioned{$to} += $m;
+        }
+    }
+    # A nick "mentioned" far more often than its activity explains is most likely an ordinary
+    # word (Dude, Guest, Canada ...), not a person: keep the direct addresses, drop the mentions.
+    my %wordlike = map { $_ => 1 }
+        grep { $mentioned{$_} > 5 * ($stats->{lines}{$_} || 0) + 30 } keys %mentioned;
+    if (%wordlike) {
+        foreach my $from (keys %rel) {
+            foreach my $to (keys %{ $rel{$from} }) {
+                $rel{$from}{$to}[1] = 0 if $wordlike{$to};
+            }
+        }
+    }
+    foreach my $from (keys %{ $stats->{rel_turns} || {} }) {
+        next if is_ignored($from) or !exists $stats->{lines}{$from};
+        foreach my $to (keys %{ $stats->{rel_turns}{$from} }) {
+            next if is_ignored($to) or !exists $stats->{lines}{$to};
+            $rel{$from}{$to}[2] += $stats->{rel_turns}{$from}{$to};
+        }
+    }
+    foreach my $from (keys %rel) {
+        foreach my $to (keys %{ $rel{$from} }) {
+            $_ ||= 0 for @{ $rel{$from}{$to} }[0 .. 2];
+        }
+    }
+    $stats->{relations} = \%rel;
+
+    # Signature word: used a lot by this nick and hardly by anyone else.
+    my (%global, %sig);
+    foreach my $n (keys %{ $stats->{rel_words} || {} }) {
+        $global{$_} += $stats->{rel_words}{$n}{$_} for keys %{ $stats->{rel_words}{$n} };
+    }
+    my $minlen = $self->{cfg}->{wordlength} > 4 ? $self->{cfg}->{wordlength} : 4;
+    foreach my $n (keys %{ $stats->{rel_words} || {} }) {
+        next if is_ignored($n) or ($stats->{lines}{$n} || 0) < 30;
+        my ($best, $bestscore, $bc, $bs) = ('', 0, 0, 0);
+        foreach my $w (keys %{ $stats->{rel_words}{$n} }) {
+            my $c = $stats->{rel_words}{$n}{$w};
+            next if $c < 4 or length($w) < $minlen or is_nick($w);      # a nick (even an ignored bot) is a name, not a word
+            # needs real letters (not ASCII art or punctuation): decode UTF-8 to tell, else use the bytes
+            my $u = eval { Encode::decode('UTF-8', $w, Encode::FB_CROAK | Encode::LEAVE_SRC) };   # LEAVE_SRC: keep $w intact
+            $u = $w unless defined $u;
+            next unless $u =~ /\p{L}{3}/;
+            next if $self->{ignorewords_regexp} and $w =~ /$self->{ignorewords_regexp}/;
+            my $total = $global{$w} or next;
+            my $share = $c / $total;
+            next if $share < 0.4;
+            my $score = $c * $share;
+            ($best, $bestscore, $bc, $bs) = ($w, $score, $c, $share) if $score > $bestscore;
+        }
+        $sig{$n} = [$best, $bc, int($bs * 100 + 0.5)] if length $best;
+    }
+    $stats->{signature} = \%sig;
+
+    delete @{$stats}{qw(rel_words rel_direct rel_turns rel_lastnick)};   # raw data no longer needed
+}
+
 sub _uniquify_nicks {
     my ($stats) = @_;
 
@@ -849,6 +986,14 @@ sub _merge_stats
         #print "$key -> $s->{$key}\n";
         if ($key =~ /^(logfile|firsttime|days|version)/) { # don't merge these
             next;
+        } elsif ($key =~ /^(rel_words|rel_direct|rel_turns)$/) { # {key}->{}->{} = int: add
+            foreach my $subkey (keys %{$s->{$key}}) {
+                foreach my $value (keys %{$s->{$key}->{$subkey}}) {
+                    $stats->{$key}->{$subkey}->{$value} += $s->{$key}->{$subkey}->{$value};
+                }
+            }
+        } elsif ($key eq 'rel_lastnick') { # str: copy
+            $stats->{$key} = $s->{$key};
         } elsif ($key =~ /^(oldtime|lastnick|lastnormal|monocount)$/) { # {key} = int/str: copy
             $stats->{$key} = $s->{$key};
         } elsif ($key =~ /^(parsedlines|totallines)$/) { # {key} = int: add
