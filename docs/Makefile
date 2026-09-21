@@ -1,5 +1,5 @@
 TARGETS := pisg-doc.txt pisg-doc.html pisg-faq.html pisg-formats.html pisg.1
-VERSION := $(shell grep "version =>" ../modules/Pisg.pm | sed 's/[^"]*"\([^"]*\)+CVS".*/\1/')
+VERSION := $(shell grep "version =>" ../modules/Pisg.pm | sed 's/[^"]*"\([^"]*\)".*/\1/; s/+CVS//')
 
 all: $(TARGETS)
 
@@ -14,8 +14,9 @@ pisg-doc.txt: pisg-doc.xml
 	cat pisg-tmp.txt | ./modifytxt.pl > pisg-doc.txt
 	rm -f pisg-tmp.txt
 
+# One self-contained page with the example configuration at the end.
 pisg-doc.html: pisg-doc.xml
-	docbook2html pisg-doc.xml -V "%use-id-as-filename%" -V nochunks
+	python3 xml2html.py pisg-doc.xml pisg-doc.html
 
 pisg-faq.html: pisg-faq.txt
 	a2x -f xhtml pisg-faq.txt

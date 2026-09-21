@@ -52,7 +52,7 @@ WHAT'S NEW IN 1.0a
  * Safer output: a page is only replaced once it is complete.
  * Optional tools in 'scripts/': profiles people edit from IRC (eggdrop),
    automatic nick merging, and log converters.
- See 'docs/Changelog' for the full list.
+ See CHANGELOG.md for this release and 'docs/Changelog' for the full history.
 
 RUNNING PISG
 ------------
@@ -81,9 +81,9 @@ pisg.cfg.
 
 NOTES
 -----
-There is some graphics in the gfx/ folder which pisg uses, you should put
-these in the same directory as your stats file(s) or use the 'PicLocation'
-configuration option.
+The bar graphics and the stylesheet are written into the stats page itself,
+so there is nothing else to copy next to it. User pictures (the 'pic' option)
+are looked up relative to the page, or use 'PicLocation' / 'ImagePath'.
 
 The stats will look best with a logfile which is at least one day long.
 Some stats (like smilies, exclamation marks, etc) doesn't get counted before

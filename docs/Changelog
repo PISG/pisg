@@ -73,6 +73,18 @@ pisg (1.0a) - Mon Sep, 21st 2026
     * Tables share one left edge; column titles and "3 days ago" stay on one
       line; the default user picture is shown as a small faded placeholder; no
       useless sideways scrollbars in the sections (checked from 360 to 1280 px).
+    Project:
+    * The project's home is now #pisg on Undernet (irc.undernet.org), no longer
+      freenode. Bugs and patches: https://github.com/PISG/pisg/issues. The old
+      SourceForge mailing list and tracker are read-only history; the README,
+      the manual and pisg.cfg point to the new places.
+    * New website, https://pisg.github.io/: the manual at /docs/ (built from
+      docs/pisg-doc.html), release notes at /changelog/, a full example
+      stats page and landing page at /demo/, and a theme creator at /themes/.
+    * The eight classic colour schemes can be downloaded as 1.0a palettes from
+      the theme creator; the classic stylesheets themselves are unchanged.
+    * CHANGELOG.md at the top of the tree summarises each release; this file
+      keeps the full history.
 
 pisg (0.73) - Wed Jan, 18th 2012
     The "Long Awaited" Release.

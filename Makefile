@@ -18,14 +18,17 @@ TARFILE = pisg-$(VERSION).tar.gz
 ZIPFILE = pisg-$(VERSION).zip
 
 FILES = pisg \
-	 COPYING \
-	 README \
+	 setup.pl \
+	 LICENSE.md \
+	 README.md \
+	 CHANGELOG.md \
 	 pisg.cfg \
 	 pisg.cfg.example \
 	 lang.txt
 
 DOCS = docs/FORMATS \
 	 docs/Changelog \
+	 docs/RELEASE-NOTES-1.0.md \
 	 docs/CREDITS \
 	 docs/pisg-doc.html \
 	 docs/pisg-doc.txt \
@@ -35,20 +38,12 @@ DOCS = docs/FORMATS \
 
 DEVDOCS = docs/dev/API
 
-GFX = gfx/green-h.png \
-	 gfx/green-v.png \
-	 gfx/blue-h.png \
-	 gfx/blue-v.png \
-	 gfx/yellow-h.png \
-	 gfx/yellow-v.png \
-	 gfx/red-h.png \
-	 gfx/red-v.png \
-
 SCRIPTS = scripts/crontab \
 	   scripts/dropegg.pl \
 	   scripts/egg2mirc.awk \
 	   scripts/eggdrop-pisg.tcl \
 	   scripts/eggdrop-pisg-test.tcl \
+	   scripts/pisg-addchan.tcl \
 	   scripts/pisg-autoalias.py \
 	   scripts/pisg-autoalias-test.py \
 	   scripts/adiirc2eggdrop.py scripts/znc-setup.sh \
@@ -133,9 +128,6 @@ release: docs
 
 	mkdir $(DIRNAME)/scripts
 	cp $(SCRIPTS) $(DIRNAME)/scripts
-
-	mkdir $(DIRNAME)/gfx
-	cp $(GFX) $(DIRNAME)/gfx
 
 	mkdir $(DIRNAME)/docs
 	cp -r $(DOCS) $(DIRNAME)/docs

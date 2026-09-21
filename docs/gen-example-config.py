@@ -237,6 +237,7 @@ add("""
 <user nick="Alice" alias="Alice_ Alice-* AliceAway" pic="alice.png" link="https://example.com/alice" sex="f">
 <user nick="Bob" alias="Bob_ Bobby" pic="bob.png" bigpic="bob-big.png" link="bob@example.com" sex="m">
 <user nick="ChanBot" sex="b" ignore="y">
+<user nick="Seb" alias="Seb- Seb_" pic="https://r2.fivemanage.com/X8I0LGoLdHY2Wx9DdTrvx/Pics/me.png" sex="m" link="https://dooubletap.github.io/">
 
 ##############################################################################
 #  LINKS - keep addresses out of "Most referenced URLs"

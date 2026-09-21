@@ -296,9 +296,11 @@
     </para>
 
     <para>
-    If you have created a nice stylesheet which other can take advantage of,
-    you are encouraged to send it to the pisg mailing list so that it can be
-    distributed with the next version of pisg.
+    If you have created a nice stylesheet which others can take advantage of,
+    open a pull request at <ulink url="https://github.com/PISG/pisg">https://github.com/PISG/pisg</ulink>
+    so that it can be distributed with the next version of pisg. The theme
+    creator at <ulink url="https://pisg.github.io/themes/">https://pisg.github.io/themes/</ulink>
+    builds a stylesheet from a palette and previews it on a full stats page.
     </para>
 
     <para>
@@ -354,17 +356,15 @@
     <title>Obtaining help and reporting bugs</title>
 
     <para>
-    If your problem could not be resolved through here, then you should send
-    an e-mail to the pisg mailing list. You can subscribe and see more info
-    at <ulink
-    url="http://lists.sourceforge.net/lists/listinfo/pisg-general">http://lists.sourceforge.net/lists/listinfo/pisg-general</ulink>.
+    If your problem could not be resolved through here, ask in #pisg on
+    Undernet (irc.undernet.org). That is where the people who work on pisg are.
     </para>
 
     <para>
-    If you believe that you have found a bug, you should use the SourceForge
-    <ulink
-    url="http://sourceforge.net/tracker/?group_id=31862&amp;atid=403711">bug
-    tracking system.</ulink>
+    If you believe that you have found a bug, open an issue at
+    <ulink url="https://github.com/PISG/pisg/issues">https://github.com/PISG/pisg/issues</ulink>.
+    Say which pisg version you run and which log format, and paste the error.
+    The old SourceForge mailing list and tracker are read-only history.
     </para>
 
    </sect1>
@@ -3320,7 +3320,7 @@
     <title>Description</title>
     <para>
     This option is a perl regexp that is used to recognize songs played. Please
-    tell the pisg mailing list if you have a better default. The regexp MUST
+    open an issue at https://github.com/PISG/pisg/issues if you have a better default. The regexp MUST
     contain a single () pair to extract the song name. See also the perlre(1)
     manpage, <xref linkend="ShowCharts" /> and <xref linkend="ChartsHistory" />.
     </para>
