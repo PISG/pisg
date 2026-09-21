@@ -421,9 +421,18 @@ sub _insights_roles
     push @roles, [ 'role_outgoing', $n, $self->_template_text('role_outgoing_v', pct => sprintf('%.0f', $v)) ] if $n and $v;
     ($n, $v) = $best->(sub { $strong->($_[0]) });
     push @roles, [ 'role_connector', $n, $self->_template_text('role_connector_v', n => $v) ] if $n and $v;
+    my $connector = $n;
     ($n, $v) = $best->(sub { $r->{listen}{ $_[0] } || 0 });
     push @roles, [ 'role_listener', $n, $self->_template_text('role_listener_v', n => $self->_ins_num($v)) ] if $n and $v;
-    ($n, $v) = $best->(sub { $st->{lines}{ $_[0] } / (1 + $strong->($_[0])) });
+    # Lone wolf: someone with fewer close contacts than the typical regular, never the connector.
+    # (Lines per contact alone always picks the busiest nick, who usually knows everybody.)
+    my @contacts = sort { $a <=> $b } map { $strong->($_) } @pool;
+    my $median = $contacts[ int($#contacts / 2) ];
+    ($n, $v) = $best->(sub {
+        my $c = $strong->($_[0]);
+        return undef if defined $connector and $_[0] eq $connector or $c >= $median;
+        return $st->{lines}{ $_[0] } / (1 + $c);
+    });
     push @roles, [ 'role_lonewolf', $n, $self->_template_text('role_lonewolf_v', lines => $self->_ins_num($st->{lines}{$n}), n => $strong->($n)) ] if $n;
     return unless @roles;
 

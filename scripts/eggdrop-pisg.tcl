@@ -334,7 +334,7 @@ namespace eval pisg {
             pisgshow {"pisgshow [name]: shows a profile. Without a name, shows yours."}
             pisgdel {"pisgdel: deletes your own profile, so your picture, link and merged nicks are removed from the stats."}
             pisgdeluser {"pisgdeluser <name>: bot masters only: deletes anybody's profile."}
-            pisgstats {"pisgstats: regenerates the stats now and gives the address (friends of the bot only)."}
+            pisgstats {"pisgstats: gives the address of this channel's stats page. Channel only, open to everyone."}
         }
     }
     proc cmd_help {nick acct isadmin arg} {
@@ -387,7 +387,7 @@ namespace eval pisg {
         bind msg - "pisg$c"            ::pisg::msg_$c
     }
 
-    # The original command, kept: regenerate the stats now and give the link.
+    # The original command, kept: give the link to this channel's stats page.
     # Open to everyone: it only points at the page the hourly cron job keeps fresh (it used to run
     # pisg inside the bot, which froze the bot for the length of the run and stayed silent
     # for anyone without the f flag).

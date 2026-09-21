@@ -60,7 +60,8 @@ pisg (1.0a) - Mon Sep, 21st 2026
       to include; your own <user> lines always win. It has its own tests.
     * eggdrop-pisg.tcl: !pisgstats is open to everybody, gives the right address
       and no longer runs pisg inside the bot; the broken timer (it posted to a nick
-      called "gchan" and ran pisg a second time) is off by default.
+      called "gchan" and ran pisg a second time) is off by default. !pisghelp
+      pisgstats describes it that way.
     Fixes:
     * A page is now written to a temporary file and moved into place only when
       it is complete, so an error can no longer leave a half-written page. pisg
@@ -70,6 +71,8 @@ pisg (1.0a) - Mon Sep, 21st 2026
     * A section that fails is skipped with a warning instead of stopping pisg.
     * An error in one channel no longer leaks its nick aliases into the next.
     * "Most used words" no longer lists punctuation or ASCII art as words.
+    * Social roles: the lone wolf has fewer close contacts than most regulars
+      and is never the connector (it used to name the busiest nick).
     * Tables share one left edge; column titles and "3 days ago" stay on one
       line; the default user picture is shown as a small faded placeholder; no
       useless sideways scrollbars in the sections (checked from 360 to 1280 px).

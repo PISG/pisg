@@ -322,7 +322,7 @@
     Using Linux, BSD or another UNIX-like system:
 
     <screen>
-    <prompt>user@host:pisg-0.37$</prompt> <userinput>./pisg</userinput>
+    <prompt>user@host:~/pisg$</prompt> <userinput>./pisg</userinput>
     </screen>
     </para>
 
