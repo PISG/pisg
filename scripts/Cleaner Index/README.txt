@@ -8,4 +8,4 @@ index.php to rwxr--r-- (744)
 Then refresh :)
 
 
-Thanks to OverCoder @ freenode for this addition.
+Thanks to OverCoder @ Undernet for this addition.

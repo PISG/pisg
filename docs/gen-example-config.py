@@ -47,7 +47,7 @@ EXTRA = {
 # ---- choices for the example ---------------------------------------------------------
 # Recommended values that differ from pisg's stock defaults, with the reason.
 RECOMMENDED = {
-    "ColorScheme": ("modern", "modern, light/dark theme; try midnight, amoled, terminal, canada, or default"),
+    "ColorScheme": ("modern", "modern, light/dark theme; try midnight, amoled, terminal, or default"),
     "Charset": ("utf-8", "UTF-8 shows accents, emoji and non-Latin scripts correctly"),
     "NickTracking": ("1", "follow nick changes so Alice, Alice_ and Alice- count as one person"),
     "DailyActivity": ("14", "show the last 14 days as a bar chart"),

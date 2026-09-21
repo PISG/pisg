@@ -1,6 +1,6 @@
-# pisg 1.0: what changed since 0.80-preview2
+# pisg 1.0a: what changed since 0.80-preview2
 
-pisg 1.0 keeps everything 0.80-preview2 does: the same parsers, the same statistics, the same
+pisg 1.0a keeps everything 0.80-preview2 does: the same parsers, the same statistics, the same
 `pisg.cfg`. On top of that it has a new look, a set of new sections, a way to run several channels
 from one folder, safer output, a guided setup, and tools to keep the statistics tidy without editing files
 by hand.
@@ -13,8 +13,8 @@ sections, which are on by default (see [Upgrading](#upgrading)).
 
 - **A guided setup**: `perl setup.pl` finds your logs, writes the configuration, makes the first page and
   explains how to run it on a schedule and host it for free. Made for people new to IRC tools.
-- **Five modern themes**, light and dark, that follow the reader's system setting: `modern`, `midnight`,
-  `amoled`, `terminal` and `canada`.
+- **Four modern themes**, light and dark: `modern`, `midnight`, `amoled` and `terminal`.
+  `modern` follows the reader's system setting.
 - **Seven new sections**: an overview, an interactive *who talks to whom* map, closest pairs, social roles,
   time personalities, *who carries the channel* and signature words.
 - **Section navigation**: a menu down the left side on wide screens, a slim bar on phones.
@@ -103,7 +103,7 @@ the statistics of the statistics:
   the time-of-day colours, a small chart of the last 30 days, and a **View stats** button;
 - the five busiest people in each channel.
 
-Old links such as `index.html#canada` still jump to that channel. Names from the JSON are always shown as
+Old links such as `index.html#mychannel` still jump to that channel. Names from the JSON are always shown as
 plain text, and only plain relative `.html` paths are accepted as links.
 
 ## New options
@@ -185,7 +185,7 @@ These are optional and live in `scripts/`.
 2. **The new sections are on by default**, in every colour scheme (the old ones show them in a plain
    style). If you want the old page exactly, set `ShowOverview`, `ShowRelations`, `ShowTimePersonalities`,
    `ShowConcentration`, `ShowSignatureWords` and `ShowNavBar` to `0`.
-3. To use the new look, add `<set ColorScheme="modern">` (or `midnight`, `amoled`, `terminal`, `canada`).
+3. To use the new look, add `<set ColorScheme="modern">` (or `midnight`, `amoled`, `terminal`).
 4. `pisg` now returns exit status 1 on failure. If a script or cron job treated any exit as success,
    check what it does with the error.
 5. For the landing page, copy `site/index.html` into your output folder and run pisg once so

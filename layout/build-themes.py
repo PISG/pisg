@@ -53,11 +53,6 @@ THEMES = {
                                 line="#17301c", line2="#24492b", hover="#0f1a12", mark="#3ddc84",
                                 male="#7fd6ff", female="#ff9ad0"),
                      sans=MONO, mono=MONO),
-    # Red and white, for #canada.
-    "canada": dict(desc="Warm paper with a maple-red series colour; dark variant follows the visitor's setting",
-                   scheme="light dark", sans=SANS, mono=MONO,
-                   light=dict(LIGHT, bg="#faf6f5", line="#e8dcdb", line2="#d3c2c1", hover="#f3eae9", mark="#c8102e"),
-                   dark=dict(DARK, bg="#150d0e", surface="#1e1416", line="#33232a", line2="#4a3239", hover="#231719", mark="#ff5a6d")),
 }
 
 KEYS = ["bg", "surface", "fg", "muted", "line", "line2", "hover", "mark",

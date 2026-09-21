@@ -1,7 +1,7 @@
 # eggdrop-pisg.tcl - pisg for eggdrop: !pisgstats, and profiles people edit themselves.
 #
 # Based on pisg.tcl by HM2K / Arganan (the !pisgstats command). The profile commands are new
-# in pisg 1.0.a. People set their own sex, picture, link and merge their nicks in chat; the
+# in pisg 1.0a. People set their own sex, picture, link and merge their nicks in chat; the
 # bot writes them to users.cfg, which pisg reads through  <include="/path/to/users.cfg">  on
 # its next run. Nothing else is needed: no web page, no database.
 #
@@ -21,7 +21,7 @@
 # only claim the nick you are using right now, so nobody can take somebody else's name.
 
 namespace eval pisg {
-    variable version   "1.0.a"
+    variable version   "1.0a"
 
     # ---- settings -------------------------------------------------------------------------
     # Change these to match your setup, or keep your own values in pisg.local.tcl next to this file

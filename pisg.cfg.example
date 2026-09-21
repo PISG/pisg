@@ -22,7 +22,7 @@
 # ---- General options -------------------------------------------------------
 
 # use a different color scheme for stats page - recommended: modern, light/dark theme;
-# try midnight, amoled, terminal, canada, or default
+# try midnight, amoled, terminal, or default
 <set ColorScheme="modern">
 
 # alternate stylesheets for stats page - extra stylesheets the visitor can switch to

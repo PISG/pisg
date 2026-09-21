@@ -37,8 +37,8 @@ where you can insert your own data.
 The commandline version has the disadvantage that you can only set up one
 channel to be run.
 
-WHAT'S NEW IN 1.0.a
--------------------
+WHAT'S NEW IN 1.0a
+------------------
  * A guided setup: 'perl setup.pl'.
  * Modern light/dark themes, a menu down the left side on wide screens (a slim
    section bar on phones), and an interactive relation map ('who talks to
@@ -94,13 +94,15 @@ be in your own language; look in lang.txt to see the supported languages.
 The language can be changed from within the pisg.cfg file.
 
 If you have any corrections to the language file, or you want to add a new
-translation, then send it to the mailing list.
+translation, open a pull request at https://github.com/PISG/pisg.
 
 CONTACT INFORMATION
 -------------------
 If you have any issues with pisg, such as problems with installing or
-running pisg, then join us on the freenode IRC Network: chat.freenode.net on #pisg
+running pisg, then join us on Undernet: irc.undernet.org, channel #pisg.
 
-The pisg homepage is located at http://pisg.github.io/.
+Bugs, patches and feature requests: https://github.com/PISG/pisg/issues
+
+The pisg homepage is located at https://pisg.github.io/.
 
 Have fun :)

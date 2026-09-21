@@ -1,4 +1,4 @@
-pisg (1.0.a) - Mon Sep, 21st 2026
+pisg (1.0a) - Mon Sep, 21st 2026
     The "Modern Look" Release.
     pisg maintainers:
     * Guided setup: run "perl setup.pl". It looks for logs already on the
@@ -6,8 +6,8 @@ pisg (1.0.a) - Mon Sep, 21st 2026
       questions, writes pisg.cfg, makes the first page, offers to run pisg on a
       schedule (cron, or a Windows scheduled task) and lists free places to
       host the pages. It never overwrites an existing pisg.cfg.
-    * New look: five modern themes (modern, midnight, amoled, terminal,
-      canada), generated from one stylesheet by layout/build-themes.py. The
+    * New look: four modern themes (modern, midnight, amoled, terminal),
+      generated from one stylesheet by layout/build-themes.py. The
       old themes are unchanged. Ink on paper with colour reserved for data:
       four time-of-day colours checked for colour-blind safety in light and
       dark, nicks and figures in monospace, sections separated by a rule

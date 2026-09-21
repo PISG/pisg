@@ -1,5 +1,5 @@
 # Original Author: paultwang - 2010-03-17
-# fixed and tweaked: Sebastien 2017-10-25
+# fixed and tweaked: Seb 2017-10-25
 
 # This is where pisg.cfg is stored
 set pp_confname "/home/jedi/pisg/pisg-0.73/pisg.cfg"
