@@ -22,6 +22,9 @@ Bugs: <https://github.com/PISG/pisg/issues>
 
 ### Changed
 
+- `docs/FORMATS` describes a recommended WeeChat setup for `weechat4`: a folder per channel with a
+  file per day (`logger.mask.irc "$server/$channel/%Y%m%d.log"`), so a channel needs only a
+  `LogDir`, and the `logger.file.time_format` the parser expects.
 - `setup.pl` picks `weechat4` for the WeeChat logs it finds.
 
 ---
