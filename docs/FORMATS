@@ -587,8 +587,14 @@ lulubot
 
   - Parser written by Vianney Lecroart <acemtp@free.fr>
 
-weechat, weechat3
------------------
+weechat, weechat3, weechat4
+---------------------------
   - http://weechat.flashtux.org/
-  - There are two parsers, one for the old log format ("weechat"), and one for
-    the new format starting from version 0.3 ("weechat3").
+  - There are three parsers: "weechat" for the old log format, "weechat3" for the format
+    of version 0.3 and later, and "weechat4" for WeeChat 4.8.0 and later.
+  - WeeChat 4.8.0 changed the default of logger.file.time_format to "%@%F %T.%fZ", so the
+    lines now start with e.g. "2026-08-17 12:34:56.123456Z". "weechat3" needs a tab right
+    after the seconds and reads none of them. "weechat4" accepts both timestamps, so it
+    also reads logs written by older versions.
+  - Only WeeChat's default prefixes ("-->", "<--", "--", " *") and time format are
+    understood.

@@ -1,0 +1,53 @@
+[
+    { method => 'normalline', line => "2026-08-17 12:34:56.123456Z\tbob\thello there",
+      expect => { hour => '12', nick => 'bob', saying => 'hello there' } },
+    { method => 'normalline', line => "2026-08-17 12:34:56Z\tbob\thello there (no fractional secs)",
+      expect => { hour => '12', nick => 'bob', saying => 'hello there (no fractional secs)' } },
+    { method => 'actionline', line => "2026-08-17 12:34:56.123456Z\t *\tbob waves",
+      expect => { hour => '12', nick => 'bob', saying => 'waves' } },
+    { method => 'thirdline', line => "2026-08-17 12:34:56.123456Z\t--\tbob has kicked alice from #channel (bye)",
+      expect => { hour => '12', min => '34', nick => 'alice', kicker => 'bob' } },
+    { method => 'thirdline', line => '2026-08-17 12:34:56.123456Z' . "\t--\t" . 'bob has changed topic from "old topic" to "new topic"',
+      expect => { hour => '12', min => '34', nick => 'bob', newtopic => 'new topic' } },
+    { method => 'thirdline', line => '2026-08-17 12:34:56.123456Z' . "\t--\t" . 'bob has changed topic to "fresh topic"',
+      expect => { hour => '12', min => '34', nick => 'bob', newtopic => 'fresh topic' } },
+    { method => 'thirdline', line => "2026-08-17 12:34:56.123456Z\t--\tMode #channel [+o alice] by bob",
+      expect => { hour => '12', min => '34', nick => 'bob', newmode => '+o' } },
+    { method => 'thirdline', line => "2026-08-17 12:34:56.123456Z\t-->\tbob (user\@host) has joined #channel",
+      expect => { hour => '12', min => '34', nick => 'bob', newjoin => 'bob' } },
+    { method => 'thirdline', line => "2026-08-17 12:34:56.123456Z\t--\tbob is now known as bobby",
+      expect => { hour => '12', min => '34', nick => 'bob', newnick => 'bobby' } },
+    { method => 'normalline', line => 'not a valid line at all', expect => undef },
+
+    # --- nicks of one letter (Q, X, z ...) and mode prefixes -------------------------------------
+    { method => 'normalline', line => "2026-08-17 12:34:56.123456Z\tQ\thello",
+      expect => { hour => '12', nick => 'Q', saying => 'hello' } },
+    { method => 'normalline', line => "2026-08-17 12:34:56.123456Z\t\@Q\thello",
+      expect => { hour => '12', nick => 'Q', saying => 'hello' } },
+    { method => 'normalline', line => "2026-08-17 12:34:56.123456Z\t+bob\thello",
+      expect => { hour => '12', nick => 'bob', saying => 'hello' } },
+    # --- actions: the mode prefix is not part of the nick ----------------------------------------
+    { method => 'actionline', line => "2026-08-17 12:34:56.123456Z\t *\t\@bob waves",
+      expect => { hour => '12', nick => 'bob', saying => 'waves' } },
+    { method => 'actionline', line => "2026-08-17 12:34:56.123456Z\t *\t+bob waves",
+      expect => { hour => '12', nick => 'bob', saying => 'waves' } },
+    { method => 'actionline', line => "2026-08-17 12:34:56.123456Z\t *\t\@Q waves",
+      expect => { hour => '12', nick => 'Q', saying => 'waves' } },
+    # --- topics: quotes inside the text, and the "for #channel" wording WeeChat 4 writes --------------
+    { method => 'thirdline', line => '2026-08-17 12:34:56.123456Z' . "\t--\t" . 'bob has changed topic for #channel from "old" to "say "hi" now"',
+      expect => { hour => '12', min => '34', nick => 'bob', newtopic => 'say "hi" now' } },
+    { method => 'thirdline', line => '2026-08-17 12:34:56.123456Z' . "\t--\t" . 'bob has changed topic for #channel to "fresh topic"',
+      expect => { hour => '12', min => '34', nick => 'bob', newtopic => 'fresh topic' } },
+    # --- lines that are not chat and must not be counted as somebody saying something ---------------
+    { method => 'normalline', line => "2026-08-17 00:00:00.123456Z\t\t::: Tuesday, 17 August 2026 :::", expect => undef },
+    { method => 'normalline', line => "2026-08-17 12:34:56.123456Z\t--\tirc: disconnected from server", expect => undef },
+    { method => 'actionline', line => "2026-08-17 12:34:56.123456Z\tbob\thello", expect => undef },
+
+    # --- logs written before WeeChat 4.8.0 (no fractional seconds, no "Z") still parse ---------------
+    { method => 'normalline', line => "2026-08-17 12:34:56\tbob\thello",
+      expect => { hour => '12', nick => 'bob', saying => 'hello' } },
+    { method => 'actionline', line => "2026-08-17 12:34:56\t *\tbob waves",
+      expect => { hour => '12', nick => 'bob', saying => 'waves' } },
+    { method => 'thirdline', line => "2026-08-17 12:34:56\t-->\tbob (user\@host) has joined #channel",
+      expect => { hour => '12', min => '34', nick => 'bob', newjoin => 'bob' } },
+]

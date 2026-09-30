@@ -9,6 +9,23 @@ Bugs: <https://github.com/PISG/pisg/issues>
 
 ---
 
+## Unreleased
+
+### Added
+
+- **`weechat4` log parser** for WeeChat 4.8.0 and later. 4.8.0 (2025-11-30) changed the
+  default `logger.file.time_format` to `%@%F %T.%fZ` (for example
+  `2026-08-17 12:34:56.123456Z`), and `weechat3` does not match a single line of such a log.
+  `weechat4` reads both the new and the older timestamp. It also keeps the mode prefix out of
+  the nick on `/me` lines, accepts one-letter nicks and keeps topics that contain quotes
+  whole. `t/parsers.t` runs the fixtures in `t/fixtures/`.
+
+### Changed
+
+- `setup.pl` picks `weechat4` for the WeeChat logs it finds.
+
+---
+
 ## 1.0a — 2026-09-21
 
 The "Modern Look" release. The `a` is for alpha: everything below works, but it has not
