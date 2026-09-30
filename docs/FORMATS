@@ -587,8 +587,77 @@ lulubot
 
   - Parser written by Vianney Lecroart <acemtp@free.fr>
 
-weechat, weechat3
------------------
+weechat, weechat3, weechat4
+---------------------------
   - http://weechat.flashtux.org/
-  - There are two parsers, one for the old log format ("weechat"), and one for
-    the new format starting from version 0.3 ("weechat3").
+  - There are three parsers: "weechat" for the old log format, "weechat3" for the format
+    of version 0.3 and later, and "weechat4" for WeeChat 4.8.0 and later.
+  - WeeChat 4.8.0 changed the default of logger.file.time_format to "%@%F %T.%fZ", so the
+    lines now start with e.g. "2026-08-17 12:34:56.123456Z". "weechat3" needs a tab right
+    after the seconds and reads none of them. "weechat4" accepts both timestamps, so it
+    also reads logs written by older versions.
+  - Only WeeChat's default prefixes ("-->", "<--", "--", " *") and time format are
+    understood.
+  - Recommended setup for "weechat4". WeeChat's default file name mask
+    ("$plugin.$name.weechatlog") writes one file per buffer that is never rotated. One folder
+    per channel with one file per day is easier for pisg: it needs only a LogDir per channel,
+    and old days can be deleted. Set this once in WeeChat:
+
+      /set logger.mask.irc "$server/$channel/%Y%m%d.log"
+      /set logger.file.time_format "%@%F %T.%fZ"
+
+    The logs are then written below the folder in logger.file.path (by default the "logs"
+    folder in WeeChat's data directory), one folder per server and channel, one file per day:
+
+      ~/.local/share/weechat/logs/
+      |-- libera/
+      |   |-- #quassel/
+      |   |   |-- 20260929.log
+      |   |   `-- 20260930.log
+      |   `-- #weechat/
+      |       |-- 20260929.log
+      |       `-- 20260930.log
+      `-- oftc/
+          |-- #moocows/
+          |   |-- 20260929.log
+          |   `-- 20260930.log
+          `-- #oftc/
+              |-- 20260929.log
+              `-- 20260930.log
+
+    WeeChat writes the whole path in lower case (logger.file.name_lower_case), and a "/" in a
+    channel name is replaced, so a name cannot add a folder. The server buffer has no channel,
+    so its log ends up in a folder literally called "$channel"; a query (private message) gets
+    a folder named after the nick.
+
+    The second command is the default of WeeChat 4.8.0 and later. It is here because
+    "weechat4" only reads that timestamp and the older "%F %T" one: if logger.file.time_format
+    was ever changed to something else, no line matches and pisg writes no page.
+
+    In pisg.cfg, one block per channel is enough: every folder holds only that channel's
+    files, so there is no LogPrefix or wildcard to get wrong.
+
+      <set Format="weechat4">
+
+      <channel="#quassel">
+          Network="libera"
+          LogDir="/home/you/.local/share/weechat/logs/libera/#quassel/"
+      </channel>
+
+      <channel="#moocows">
+          Network="oftc"
+          LogDir="/home/you/.local/share/weechat/logs/oftc/#moocows/"
+      </channel>
+
+    The files sort by name, which is by date, and compressed days (20260929.log.gz) in the
+    same folder are read too.
+
+    A different mask works as well, as long as pisg can tell one channel's files from the
+    others'. With the mask "%Y/%m/$server/$channel.log" a channel has one file per month, in a
+    different folder each month, so a LogDir does not fit; use a wildcard, which pisg expands
+    and sorts by path (the trailing "*" picks up both ".log" and ".log.gz"):
+
+      <channel="#quassel">
+          Network="libera"
+          Logfile="/home/you/.local/share/weechat/logs/*/*/libera/#quassel.log*"
+      </channel>

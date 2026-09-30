@@ -115,7 +115,7 @@ sub detect_clients {
     }
     # WeeChat: irc.<server>.<#channel>.weechatlog
     for my $d ("$HOME/.local/share/weechat/logs", "$HOME/.weechat/logs") {
-        file_candidates('WeeChat', 'weechat3', $d, qr/^irc\.[^.]+\.([#&].+)\.weechatlog$/);
+        file_candidates('WeeChat', 'weechat4', $d, qr/^irc\.[^.]+\.([#&].+)\.weechatlog$/);   # reads the old and the 4.8+ timestamps
     }
     # HexChat / XChat: logs/<NETWORK>/<#channel>.log
     for my $r ("$HOME/.config/hexchat/logs", "$HOME/.xchat2/xchatlogs", ($APPDATA ? "$APPDATA/HexChat/logs" : ())) {
