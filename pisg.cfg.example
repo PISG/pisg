@@ -43,8 +43,9 @@
 # use a cache to speed up log parsing - cache parsed logs here to speed up runs (delete
 # it when you change settings)
 #<set CacheDir="cache/">
-# Keep the statistics of logs even after you delete them (see the manual):
-#<set LogCacheDir="logcache/">
+# Keep the statistics when you delete old logs: one file per network and channel here
+# (set Network for each channel; see the manual):
+#<set HistoryDir="history/">
 
 # name of the channel list file for a landing page
 <set ChannelIndex="channels.json">

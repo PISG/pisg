@@ -115,7 +115,8 @@ sub get_default_config_settings
         logsuffix => '',
         silent => 0,
         cachedir => '',
-        logcachedir => '',
+        historydir => '',
+        historyrebuild => 0,
         channelindex => 'channels.json',
         userpics => 'y',
 

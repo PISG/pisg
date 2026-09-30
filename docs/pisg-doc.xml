@@ -1088,62 +1088,83 @@
     </refsect1>
     </refentry>
 
-    <refentry id="LogCacheDir">
+    <refentry id="HistoryDir">
 
-    <refmeta> <refentrytitle>LogCacheDir</refentrytitle> </refmeta>
+    <refmeta> <refentrytitle>HistoryDir</refentrytitle> </refmeta>
 
     <refnamediv>
-    <refname>LogCacheDir</refname>
-    <refpurpose>keep the statistics of logs even after they are deleted</refpurpose>
+    <refname>HistoryDir</refname>
+    <refpurpose>keep the statistics when old logs are deleted</refpurpose>
     </refnamediv>
 
     <refsynopsisdiv><programlisting>
       <![CDATA[
-        <set LogCacheDir="pisg_logs">
-        <set LogCacheDir="/path/to/pisg_logs">
+        <set HistoryDir="pisg_history">
+        <set HistoryDir="/path/to/pisg_history">
       ]]>
     </programlisting></refsynopsisdiv>
 
     <refsect1>
     <title>Description</title>
     <para>
-    Setting this option makes pisg keep, for every log it reads, the parsed
-    statistics of that log in this directory (two files per log). When a log
-    is later deleted, pisg uses the kept statistics instead, so the number of
-    days, lines and nicks in the report keep growing as if every log were
-    still there. This is meant for people who rotate or delete old logs but
-    want uninterrupted statistics.
+    With this option pisg keeps everything the logs told it in a file of its
+    own, one per network and channel (<filename>network.channel.pisghist</filename>
+    in this directory, so set <xref linkend="Network" />). Each run reads only
+    what was added to the logs since the last run, adds it to that file and
+    writes it again. The logs are not needed after that: old ones can be
+    deleted, rotated away or compressed, and the number of days, lines and nicks
+    in the report keeps growing as if every log were still there. This is meant
+    for people who delete old logs but want uninterrupted statistics.
     </para>
 
     <para>
-    It is separate from <xref linkend="CacheDir" />, which is only a
-    speed-up: the <xref linkend="CacheDir" /> can be deleted at any time
-    (for example after changing the configuration) without losing anything,
-    while this directory is the record of the logs that no longer exist and
-    should be kept, and backed up. A log that still exists is always read
-    with the current settings and its kept copy is updated, so a changed
-    configuration takes effect for every log that is still there; the
-    statistics of deleted logs keep the settings they had when the log was
-    last read.
+    pisg remembers, for every log, how much of it was read. A log that grows is
+    read from where it stopped, so a single log that is never rotated (WeeChat
+    writes one per channel by default) is fine, and so are daily logs. A log
+    that is renamed, moved or compressed is recognised again by its first line
+    and by the end of the part that was read (a checksum of both is kept), and
+    is not counted twice; a different log that reuses a name is a new log. A
+    last line without a newline, in a log that changed in the last two minutes,
+    is left until it is complete. Logs are read in the order pisg lists them, so
+    they must sort by date.
     </para>
 
     <para>
-    With <xref linkend="LogDir" /> the deleted logs are found through this
-    directory (only those that were in that directory and match
-    <xref linkend="LogPrefix" />, so channels and networks sharing one
-    LogCacheDir do not see each other's logs). Explicit
-    <xref linkend="Logfile" /> entries of a deleted log work too. Only what
-    was read when the log was last seen counts, so let pisg run once after
-    a log is finished and before it is deleted.
+    It replaces <xref linkend="CacheDir" /> for that channel, which is not used
+    when this option is set.
+    </para>
+    </refsect1>
+
+    <refsect1>
+    <title>Things to know</title>
+    <para>
+    The history is the only copy of the statistics of logs that no longer
+    exist, so back it up. It is written aside and then moved into place, so a
+    run that is interrupted does not damage it, and the copy before the last
+    change is kept as <filename>.pisghist.bak</filename> (it is used if the file
+    cannot be read). A history that cannot be read is never replaced by an empty
+    one: the channel is skipped and pisg says why. Two runs on the same history
+    at the same time are not allowed either; the second one skips the channel.
     </para>
 
     <para>
-    To forget a deleted log, delete its two files
-    (<filename>.pisgarchive</filename> and <filename>.pisgindex</filename>)
-    from the directory. A deleted log cannot be read again, so an archive
-    written by another pisg version is used anyway, with a warning.
-    <xref linkend="NFiles" /> still limits pisg to the last N logs, and
-    deleted logs count as the oldest.
+    What was read is not read again, so a change of settings (words to ignore,
+    <xref linkend="Charset" /> and so on) does not change the statistics that
+    are already in the history; it applies to what is read from now on. To
+    start again from the logs that still exist, run once with
+    <command>-cf HistoryRebuild=1</command>: the old history is kept aside as
+    <filename>.pisghist.TIME.old</filename>, and what only it contained is not
+    in the new one. To forget a channel, delete its history file.
+    </para>
+
+    <para>
+    Let pisg run once after a log is finished and before it is deleted: a log
+    that is deleted before pisg has read it is not counted. Words that were used
+    only a few times are dropped from the history, as pisg does on every run
+    (words used in this run are kept, so a word used a little every day is
+    counted); the history is otherwise about as big as the statistics of all the
+    logs together. <xref linkend="NFiles" /> still limits pisg to the last N
+    logs of a <xref linkend="LogDir" />.
     </para>
     </refsect1>
     <refsect1>

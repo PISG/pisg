@@ -13,11 +13,18 @@ Bugs: <https://github.com/PISG/pisg/issues>
 
 ### Added
 
-- **`LogCacheDir`: keep the statistics of deleted logs.** With this directory set, pisg keeps
-  the parsed statistics of every log it reads; when a log is deleted they are used instead, so
-  the days, lines and nicks in the report keep growing as if every log were still there.
-  It is separate from `CacheDir` (which stays a disposable speed-up): deleting `CacheDir`
-  never loses history. See `LogCacheDir` in the manual.
+- **`HistoryDir`: keep the statistics when old logs are deleted.** With this directory set, pisg
+  keeps what the logs told it in one file per network and channel, and each run reads only what was
+  added to the logs since. Logs can then be deleted, rotated or compressed, and the days, lines and
+  nicks in the report keep growing as if every log were still there. A log that grows is read from
+  where it stopped; a renamed or compressed log is recognised, not counted twice. Built in small
+  steps, the history holds the same statistics as one run over all the logs. See `HistoryDir` in
+  the manual, and `HistoryRebuild` to start again from the logs that still exist.
+
+### Changed
+
+- The `.bz2`, `.gz` and `.xz` decompressors are started without a shell, so a log with an odd name
+  (spaces, `#` or `;` in it) can be read.
 
 ## 1.0a — 2026-09-21
 
