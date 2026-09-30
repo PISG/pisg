@@ -1076,6 +1076,23 @@
     </para>
 
     <para>
+    A log that was parsed once can then be deleted: when pisg finds that a
+    log is gone, it uses the cached statistics of that log instead. With
+    <xref linkend="LogDir" /> the deleted logs are found through the cache
+    (only those that were in that directory and match
+    <xref linkend="LogPrefix" />, so channels and networks sharing one
+    CacheDir do not see each other's logs), and the number of days, lines
+    and nicks keeps growing as if every log were still there. Only what was
+    in the cache when the log was deleted counts, so let pisg run once
+    after a log is finished and before it is deleted. To forget a deleted
+    log, delete its two cache files (<filename>.pisgstats</filename> and
+    <filename>.pisglines</filename>). A deleted log cannot be parsed again,
+    so a cache written by another pisg version is used anyway, with a
+    warning, instead of being dropped. <xref linkend="NFiles" /> still
+    limits pisg to the last N logs, and deleted logs count as the oldest.
+    </para>
+
+    <para>
     Note that the cache files should be deleted when the pisg config file is
     changed since the cache data uses the old config settings.
     <xref linkend="NickTracking" /> does not work especially well with the

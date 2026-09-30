@@ -9,6 +9,16 @@ Bugs: <https://github.com/PISG/pisg/issues>
 
 ---
 
+## Unreleased
+
+### Added
+
+- **`CacheDir`: deleted logs keep counting.** Once a log has been parsed with `CacheDir`
+  set, it can be deleted: its cached statistics are used, and with `LogDir` the deleted
+  logs are found through the cache (per directory and `LogPrefix`, so channels and
+  networks sharing one `CacheDir` stay apart). The days, lines and nicks in the report keep
+  growing as if every log were still there. See `CacheDir` in the manual.
+
 ## 1.0a — 2026-09-21
 
 The "Modern Look" release. The `a` is for alpha: everything below works, but it has not

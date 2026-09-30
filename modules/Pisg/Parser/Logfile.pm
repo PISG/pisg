@@ -215,13 +215,19 @@ sub _parse_dir
         my @filesarray;
         opendir(LOGDIR, $logdir) or
         die("Can't opendir ${logdir}: $!");
-        unless(@filesarray = grep {
+        @filesarray = grep {
             /^[^\.]/ && /^$self->{cfg}->{logprefix}/ && -f "$logdir/$_"
-            } readdir(LOGDIR)) {
-                print ("No files in \"$logdir\" matched prefix \"$self->{cfg}->{logprefix}\"\n");
-                return;
-        }
+            } readdir(LOGDIR);
         closedir(LOGDIR);
+
+        # Logs that were parsed earlier and have since been deleted still count: their cached
+        # statistics are used. They go into the same list so they are sorted in with the rest.
+        push @filesarray, $self->_gone_logs($logdir, \@filesarray);
+
+        unless (@filesarray) {
+            print ("No files in \"$logdir\" matched prefix \"$self->{cfg}->{logprefix}\"\n");
+            return;
+        }
 
         if ($self->{cfg}->{logsuffix} ne '') {
             my @temparray;
@@ -309,6 +315,39 @@ sub _truncate
         $t = substr($t, 0, length($t) - 1 - $have) if $have < $need;
     }
     return $t;
+}
+
+# Names (relative to $logdir) of the logs in that directory which are gone from disk but still
+# have a cache. Only cache files whose stored logfile path lies directly in $logdir and matches
+# LogPrefix are considered, so channels sharing one CacheDir do not pick up each other's logs.
+sub _gone_logs
+{
+    my ($self, $logdir, $present) = @_;
+    my $cachedir = $self->{cfg}->{cachedir};
+    return () unless $cachedir and -d $cachedir;
+
+    my $mangle = sub { my $n = shift; $n =~ s/[^\w-]/_/go; return $n };
+    my $stem = $mangle->($logdir);
+    my %have = map { $mangle->("$logdir$_") => 1 } @$present;
+
+    opendir(my $dh, $cachedir) or return ();
+    my @candidates = grep { /^\Q$stem\E.*\.pisgstats$/ } readdir($dh);
+    closedir($dh);
+
+    my @gone;
+    foreach my $file (sort @candidates) {
+        (my $base = $file) =~ s/\.pisgstats$//;
+        next if $have{$base};
+        next unless -e "$cachedir/$base.pisglines";
+        my $stats = eval { retrieve("$cachedir/$file") } or next;
+        my $logfile = $stats->{logfile};
+        next unless defined $logfile and $logfile =~ m{^\Q$logdir\E([^/]+)$};
+        my $name = $1;
+        next unless $name =~ /^$self->{cfg}->{logprefix}/;
+        next if -e $logfile;            # a log that exists is found by the directory scan
+        push @gone, $name;
+    }
+    return @gone;
 }
 
 sub _parse_file
@@ -937,7 +976,8 @@ sub _adjusttimeoffset
 sub _read_cache
 {
     my ($self, $statsref, $linesref, $logfile) = @_;
-    my $csum = (split(' ', `sum -s $logfile`))[0];
+    my $gone = !-e $logfile;    # deleted since it was parsed: the cache is all there is left of it
+    my $csum = $gone ? undef : (split(' ', `sum -s $logfile`))[0];
     my $cachefile = $logfile;
     $cachefile =~ s/[^\w-]/_/go;
     $cachefile = "$self->{cfg}->{cachedir}/$cachefile";
@@ -948,11 +988,19 @@ sub _read_cache
     my $lines = retrieve("$cachefile.pisglines");
     my $stats = retrieve("$cachefile.pisgstats");
 
-    return undef if $stats->{version} and $stats->{version} ne $self->{cfg}->{version};
     return undef unless $stats->{logfile} eq $logfile; # the name might be ambigous
-    return undef if $stats->{logfile_csum} != $csum; # file has changed
 
-    print "cached, " unless $self->{cfg}->{silent};
+    if ($stats->{version} and $stats->{version} ne $self->{cfg}->{version}) {
+        # A log that still exists is simply parsed again. One that is gone cannot be: dropping its
+        # cache would lose its statistics for good, so keep using it and say so.
+        return undef unless $gone;
+        print STDERR "Warning: the cache of the deleted log $logfile is from pisg $stats->{version}, "
+                   . "this is $self->{cfg}->{version}; using it anyway.\n";
+    }
+
+    return undef if !$gone and $stats->{logfile_csum} != $csum; # file has changed
+
+    print $gone ? "gone, using cached statistics, " : "cached, " unless $self->{cfg}->{silent};
     $$statsref = $stats;
     $$linesref = $lines;
 
