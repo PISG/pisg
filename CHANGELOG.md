@@ -13,11 +13,11 @@ Bugs: <https://github.com/PISG/pisg/issues>
 
 ### Added
 
-- **`CacheDir`: deleted logs keep counting.** Once a log has been parsed with `CacheDir`
-  set, it can be deleted: its cached statistics are used, and with `LogDir` the deleted
-  logs are found through the cache (per directory and `LogPrefix`, so channels and
-  networks sharing one `CacheDir` stay apart). The days, lines and nicks in the report keep
-  growing as if every log were still there. See `CacheDir` in the manual.
+- **`LogCacheDir`: keep the statistics of deleted logs.** With this directory set, pisg keeps
+  the parsed statistics of every log it reads; when a log is deleted they are used instead, so
+  the days, lines and nicks in the report keep growing as if every log were still there.
+  It is separate from `CacheDir` (which stays a disposable speed-up): deleting `CacheDir`
+  never loses history. See `LogCacheDir` in the manual.
 
 ## 1.0a — 2026-09-21
 

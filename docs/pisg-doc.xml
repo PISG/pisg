@@ -1076,27 +1076,74 @@
     </para>
 
     <para>
-    A log that was parsed once can then be deleted: when pisg finds that a
-    log is gone, it uses the cached statistics of that log instead. With
-    <xref linkend="LogDir" /> the deleted logs are found through the cache
-    (only those that were in that directory and match
-    <xref linkend="LogPrefix" />, so channels and networks sharing one
-    CacheDir do not see each other's logs), and the number of days, lines
-    and nicks keeps growing as if every log were still there. Only what was
-    in the cache when the log was deleted counts, so let pisg run once
-    after a log is finished and before it is deleted. To forget a deleted
-    log, delete its two cache files (<filename>.pisgstats</filename> and
-    <filename>.pisglines</filename>). A deleted log cannot be parsed again,
-    so a cache written by another pisg version is used anyway, with a
-    warning, instead of being dropped. <xref linkend="NFiles" /> still
-    limits pisg to the last N logs, and deleted logs count as the oldest.
-    </para>
-
-    <para>
     Note that the cache files should be deleted when the pisg config file is
     changed since the cache data uses the old config settings.
     <xref linkend="NickTracking" /> does not work especially well with the
     cache when using different <xref linkend="NFiles" /> settings.
+    </para>
+    </refsect1>
+    <refsect1>
+    <title>Default</title>
+    <para> Unset </para>
+    </refsect1>
+    </refentry>
+
+    <refentry id="LogCacheDir">
+
+    <refmeta> <refentrytitle>LogCacheDir</refentrytitle> </refmeta>
+
+    <refnamediv>
+    <refname>LogCacheDir</refname>
+    <refpurpose>keep the statistics of logs even after they are deleted</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv><programlisting>
+      <![CDATA[
+        <set LogCacheDir="pisg_logs">
+        <set LogCacheDir="/path/to/pisg_logs">
+      ]]>
+    </programlisting></refsynopsisdiv>
+
+    <refsect1>
+    <title>Description</title>
+    <para>
+    Setting this option makes pisg keep, for every log it reads, the parsed
+    statistics of that log in this directory (two files per log). When a log
+    is later deleted, pisg uses the kept statistics instead, so the number of
+    days, lines and nicks in the report keep growing as if every log were
+    still there. This is meant for people who rotate or delete old logs but
+    want uninterrupted statistics.
+    </para>
+
+    <para>
+    It is separate from <xref linkend="CacheDir" />, which is only a
+    speed-up: the <xref linkend="CacheDir" /> can be deleted at any time
+    (for example after changing the configuration) without losing anything,
+    while this directory is the record of the logs that no longer exist and
+    should be kept, and backed up. A log that still exists is always read
+    with the current settings and its kept copy is updated, so a changed
+    configuration takes effect for every log that is still there; the
+    statistics of deleted logs keep the settings they had when the log was
+    last read.
+    </para>
+
+    <para>
+    With <xref linkend="LogDir" /> the deleted logs are found through this
+    directory (only those that were in that directory and match
+    <xref linkend="LogPrefix" />, so channels and networks sharing one
+    LogCacheDir do not see each other's logs). Explicit
+    <xref linkend="Logfile" /> entries of a deleted log work too. Only what
+    was read when the log was last seen counts, so let pisg run once after
+    a log is finished and before it is deleted.
+    </para>
+
+    <para>
+    To forget a deleted log, delete its two files
+    (<filename>.pisgarchive</filename> and <filename>.pisgindex</filename>)
+    from the directory. A deleted log cannot be read again, so an archive
+    written by another pisg version is used anyway, with a warning.
+    <xref linkend="NFiles" /> still limits pisg to the last N logs, and
+    deleted logs count as the oldest.
     </para>
     </refsect1>
     <refsect1>
