@@ -6,6 +6,9 @@ package Pisg::Parser::Logfile;
 use strict;
 use Encode ();
 use Storable;
+use Digest::MD5 qw(md5_hex);
+use Fcntl qw(:flock);
+use File::Spec;
 
 $^W = 1;
 
@@ -107,6 +110,13 @@ sub analyze
 
     my $starttime = time();
 
+    # HistoryDir: the statistics of every log read so far are kept in a file of their own, so
+    # that logs can be deleted without the statistics changing.
+    my $history;
+    if ($self->{cfg}->{historydir}) {
+        $history = $self->_history_open() or return undef;
+    }
+
     my @logfiles = @{$self->{cfg}->{logfile}};
     # expand wildcards
     @logfiles = map { if(/[\[*?]/) { glob; } else { $_; } } @logfiles;
@@ -139,6 +149,16 @@ sub analyze
         parsedlines => 0,
         totallines => 0,
     );
+    my %touched;    # words seen in the logs read by this run (see _history_prune)
+
+    if ($history) {
+        # start from what earlier runs kept
+        %stats = %{ $history->{stats} };
+        %lines = %{ $history->{lines} };
+        foreach (keys %{$stats{lastvisited}}) {
+            find_alias($_);
+        }
+    }
 
     if ($self->{cfg}->{cachedir} and not -d $self->{cfg}->{cachedir}) {
         print STDERR "CacheDir \"$self->{cfg}->{cachedir}\" not found. Skipping caching.\n";
@@ -148,6 +168,19 @@ sub analyze
     foreach my $logfile (@logfiles) {
         # Run through the logfile
         print "Analyzing log $logfile... " unless ($self->{cfg}->{silent});
+
+        if ($history) {
+            # only what was added to the log since the last run is read
+            my ($hs, $hl) = $self->_history_delta($history, $logfile);
+            if ($hs) {
+                $touched{$_} = 1 foreach keys %{$hs->{wordcounts}};
+                $self->_merge_stats(\%stats, $hs);
+                $self->_merge_lines(\%lines, $hl);
+            }
+            print "$stats{days} days, $stats{parsedlines} lines total\n"
+                unless ($self->{cfg}->{silent});
+            next;
+        }
 
         my $s = {
             oldtime => 24,
@@ -175,6 +208,13 @@ sub analyze
 
         print "$stats{days} days, $stats{parsedlines} lines total\n"
             unless ($self->{cfg}->{silent});
+    }
+
+    if ($history) {
+        # what is kept is what was read, before the page-only processing below
+        $self->_history_prune(\%stats, \%touched);
+        $self->_history_save($history, \%stats, \%lines) if $history->{dirty};
+        $self->_history_close($history);
     }
 
     if ($self->{cfg}->{statsdump}) {
@@ -311,26 +351,77 @@ sub _truncate
     return $t;
 }
 
+# Open a log for reading: plain, or through the decompressor for .bz2, .gz and .xz.
+# The decompressor is run without a shell, so no file name can be misread as a command.
+sub _open_log
+{
+    my ($self, $file) = @_;
+    my $fh;
+    if ($file =~ /\.bz2?$/ && -f $file) {
+        open ($fh, '-|', 'bunzip2', '-c', $file) or
+        die("$0: Unable to open logfile($file): $!\n");
+    } elsif ($file =~ /\.gz$/ && -f $file) {
+        open ($fh, '-|', 'gunzip', '-c', $file) or
+        die("$0: Unable to open logfile($file): $!\n");
+    } elsif ($file =~ /\.xz$/ && -f $file) {
+        open ($fh, '-|', 'unxz', '-c', $file) or
+        die("$0: Unable to open logfile($file): $!\n");
+    } else {
+        open ($fh, '<', $file) or
+        die("$0: Unable to open logfile($file): $!\n");
+    }
+    return $fh;
+}
+
+sub _is_compressed { return $_[0] =~ /\.(?:bz2?|gz|xz)$/ }
+
+# $skip and $progress are for HistoryDir: the first $skip bytes were read by an earlier run and
+# are passed over, and $progress (a hash) gets back how far the log was read:
+#   offset  bytes read, counted in the (decompressed) text, up to the end of the last line used
+#   tail, taillen  checksum and length of that last line (only if a line was read)
+#   short   1 if the log has fewer than $skip bytes
+#   partial 1 if a last line without a newline was left for later (a log that is still being written)
 sub _parse_file
 {
     my $self = shift;
-    my ($stats, $lines, $file) = @_;
+    my ($stats, $lines, $file, $skip, $progress) = @_;
 
-    if ($file =~ /.bz2?$/ && -f $file) {
-        open (LOGFILE, "bunzip2 -c $file |") or
-        die("$0: Unable to open logfile($file): $!\n");
-    } elsif ($file =~ /.gz$/ && -f $file) {
-        open (LOGFILE, "gunzip -c $file |") or
-        die("$0: Unable to open logfile($file): $!\n");
-    } elsif ($file =~ /.xz$/ && -f $file) {
-        open (LOGFILE, "unxz -c $file |") or
-        die("$0: Unable to open logfile($file): $!\n");
-    } else {
-        open (LOGFILE, $file) or
-        die("$0: Unable to open logfile($file): $!\n");
+    my $fh = $self->_open_log($file);
+    my ($offset, $physical, $hold, $last) = (0, 0, 0, undef);
+    if ($progress) {
+        # a last line without a newline is probably still being written: leave it until it is complete
+        $hold = !_is_compressed($file) && (time - (stat($file))[9]) < 120;
+        if ($skip) {
+            if (_is_compressed($file)) {
+                my $left = $skip;
+                while ($left > 0) {
+                    my $n = read($fh, my $buf, $left > 65536 ? 65536 : $left);
+                    last unless $n;
+                    $left -= $n;
+                }
+                $offset = $skip - $left;
+            } else {
+                seek($fh, $skip, 0) or die("$0: Unable to seek in logfile($file): $!\n");
+                $offset = $skip;
+            }
+            if ($offset < $skip) {
+                $progress->{short} = 1;
+                close($fh);
+                return;
+            }
+        }
     }
 
-    while(my $line = <LOGFILE>) {
+    while(my $line = <$fh>) {
+        if ($progress) {
+            if ($line !~ /\n\z/ and $hold) {
+                $progress->{partial} = 1;
+                last;
+            }
+            $offset += length($line);
+            $physical++;
+            $last = $line;
+        }
         $line = _strip_mirccodes($line);
         $line =~ s/\r+$//;       # Strip DOS Formatting
 
@@ -641,23 +732,40 @@ sub _parse_file
         unless ($stats->{parsedlines} % 10000) { # keep only recent quotes to save memory
             $self->_trim_lines($lines);
         }
-    } # while(my $line = <LOGFILE>)
+    } # while(my $line = <$fh>)
 
     $self->_trim_lines($lines);
 
-    my $wordcount = sqrt(sqrt(keys %{$stats->{wordcounts}})); # remove less frequent words
+    if ($progress) {
+        # a part of a log is not the place to drop the rare words: that is done on the sum, see _history_prune
+        $stats->{totallines} = $physical;
+        $progress->{offset} = $offset;
+        if (defined $last) {                 # the end of what was read, to recognise the log again
+            $progress->{tail} = md5_hex($last);
+            $progress->{taillen} = length($last);
+        }
+    } else {
+        $self->_prune_words($stats);
+        $stats->{totallines} = $.;
+    }
+
+    close($fh);
+}
+
+# remove less frequent words
+sub _prune_words
+{
+    my ($self, $stats, $keep) = @_;
+    my $wordcount = sqrt(sqrt(keys %{$stats->{wordcounts}}));
     foreach my $word (keys %{$stats->{wordcounts}}) {
         if ($stats->{wordcounts}->{$word} < $wordcount) {
             next if defined $stats->{chartcounts}{$word};
+            next if $keep and $keep->{$word};
             delete $stats->{wordcounts}->{$word};
             delete $stats->{wordnicks}->{$word};
             delete $stats->{word_upcase}->{$word};
         }
     }
-
-    $stats->{totallines} = $.;
-
-    close(LOGFILE);
 }
 
 sub _modechanges
@@ -972,6 +1080,299 @@ sub _update_cache
 
     store $stats, "$cachefile.pisgstats";
     store $lines, "$cachefile.pisglines";
+}
+
+# ---- HistoryDir -----------------------------------------------------------------------------
+#
+# One file per network and channel keeps everything the logs told pisg so far: the statistics,
+# the quote lines, and for every log how much of it was read (its "manifest"). Each run reads
+# only what was added since, adds it and saves the file again. The logs themselves are not needed
+# after that, so old ones can be deleted or rotated away without the statistics changing.
+#
+#   { format => 1, version => pisg version, stats => {...}, lines => {...},
+#     logs => { $path => { fp, offset, tail, taillen, size, mtime, state } } }
+#
+#   fp      a checksum of the first line of the log (of the text, not of a compressed file)
+#   offset  how many bytes of the (decompressed) text were read
+#   tail, taillen  a checksum and the length of the last line that was read: a log is the same log
+#           only if its text ends the part that was read with that line. With fp this tells a log
+#           that was renamed, moved or compressed from a different log that starts the same way
+#   state   who spoke last and the like, so that a log that is read on goes on where it stopped
+#   size, mtime  of the file when it was read: a log that has not changed is not looked at again
+
+my $HISTORY_FORMAT = 1;
+
+sub _history_file
+{
+    my ($self) = @_;
+    my $name = join '.', map {
+        my $n = lc(defined $_ ? $_ : '');
+        $n =~ s/([^A-Za-z0-9_.-])/sprintf('%%%02X', ord($1))/ge;
+        $n;
+    } $self->{cfg}->{network}, $self->{cfg}->{channel};
+    return "$self->{cfg}->{historydir}/$name.pisghist";
+}
+
+sub _history_new
+{
+    return {
+        format => $HISTORY_FORMAT,
+        stats => {
+            oldtime => 24, days => 0, lastnick => '', monocount => 0,
+            day_lines => [ undef ], day_times => [ undef ],
+            parsedlines => 0, totallines => 0,
+        },
+        lines => {},
+        logs => {},
+        dirty => 1,
+    };
+}
+
+# Read one history file; returns the history, or undef if it cannot be used (and says why).
+sub _history_load
+{
+    my ($self, $file) = @_;
+    my $h = eval { retrieve($file) };
+    unless (ref $h eq 'HASH' and ref $h->{stats} eq 'HASH' and ref $h->{lines} eq 'HASH'
+            and ref $h->{logs} eq 'HASH' and defined $h->{format}) {
+        print STDERR "History file $file is damaged or not a history file.\n";
+        return undef;
+    }
+    if ($h->{format} > $HISTORY_FORMAT) {
+        print STDERR "History file $file is from a newer pisg (format $h->{format}); this pisg reads format $HISTORY_FORMAT.\n";
+        return undef;
+    }
+    if ($h->{version} and $h->{version} ne $self->{cfg}->{version}) {
+        print STDERR "Warning: history file $file was written by pisg $h->{version}, this is "
+                   . "$self->{cfg}->{version}; using it anyway.\n";
+    }
+    return $h;
+}
+
+# Lock and read the history of this channel. Returns undef (after saying why) if the channel
+# should be skipped: a history that cannot be read is never replaced by an empty one, and two runs
+# on the same history at once would overwrite each other.
+sub _history_open
+{
+    my ($self) = @_;
+    my $dir = $self->{cfg}->{historydir};
+    unless (-d $dir) {
+        print STDERR "HistoryDir \"$dir\" not found. Skipping channel $self->{cfg}->{channel}.\n";
+        return undef;
+    }
+    my $file = $self->_history_file();
+
+    open(my $lock, '>>', "$file.lock") or do {
+        print STDERR "Cannot write in HistoryDir \"$dir\": $!. Skipping channel $self->{cfg}->{channel}.\n";
+        return undef;
+    };
+    unless (flock($lock, LOCK_EX | LOCK_NB)) {
+        print STDERR "The history of $self->{cfg}->{channel} ($file) is in use by another pisg. Skipping it.\n";
+        close $lock;
+        return undef;
+    }
+
+    my $h;
+    if ($self->{cfg}->{historyrebuild}) {
+        # start again from the logs that still exist; the old history is kept aside
+        my $stamp = time;
+        foreach my $f ($file, "$file.bak") {
+            rename($f, "$f.$stamp.old") if -e $f;
+        }
+        print STDERR "HistoryRebuild: the old history of $self->{cfg}->{channel} is kept as $file.$stamp.old; "
+                   . "what only it contained is gone from the new one.\n" unless $self->{cfg}->{silent};
+        $h = _history_new();
+    } elsif (-e $file or -e "$file.bak") {
+        $h = -e $file ? $self->_history_load($file) : undef;
+        unless ($h) {
+            if (-e "$file.bak") {
+                print STDERR "Using the previous copy, $file.bak.\n";
+                $h = $self->_history_load("$file.bak");
+                if ($h) {
+                    $h->{dirty} = 1;
+                    $h->{from_bak} = 1;
+                }
+            }
+        }
+        unless ($h) {
+            print STDERR "Not starting a new history over one that cannot be read. Skipping channel "
+                       . "$self->{cfg}->{channel}; fix or remove $file, or run with HistoryRebuild=1.\n";
+            close $lock;
+            return undef;
+        }
+    } else {
+        $h = _history_new();
+        print "No history yet for $self->{cfg}->{channel}: starting one in $file\n" unless $self->{cfg}->{silent};
+    }
+    $h->{file} = $file;
+    $h->{lock} = $lock;
+    return $h;
+}
+
+sub _history_close
+{
+    my ($self, $h) = @_;
+    close $h->{lock} if $h->{lock};     # releases the lock
+}
+
+# Write the history so that a run that is interrupted never leaves a half-written file: the new
+# copy is written aside, the old one becomes .bak, then the new one takes its place.
+sub _history_save
+{
+    my ($self, $h, $stats, $lines) = @_;
+    my $file = $h->{file};
+    my $tmp = "$file.tmp$$";
+    my %copy = (
+        format => $HISTORY_FORMAT, version => $self->{cfg}->{version},
+        stats => $stats, lines => $lines, logs => $h->{logs},
+    );
+    eval { Storable::nstore(\%copy, $tmp); 1 } or do {
+        unlink $tmp;
+        die "Cannot write the history $file: $@";
+    };
+    if (-e $file) {
+        if ($h->{from_bak}) {
+            rename($file, "$file.damaged." . time);     # the .bak is the good one: keep it
+        } else {
+            rename($file, "$file.bak");
+        }
+    }
+    rename($tmp, $file) or die "Cannot write the history $file: $!\n";
+    $h->{dirty} = 0;
+}
+
+# Rare words are dropped from the sum, not from a part of a log (see _parse_file). Words seen in
+# this run stay: a word used a few times every day never reaches the threshold in one run.
+sub _history_prune
+{
+    my ($self, $stats, $touched) = @_;
+    $self->_prune_words($stats, $touched);
+}
+
+# The first line of a log, as a checksum; undef if the log has no complete line yet.
+sub _fingerprint
+{
+    my ($self, $file) = @_;
+    my $fh = $self->_open_log($file);
+    my $first = <$fh>;
+    close $fh;
+    return undef unless defined $first and $first =~ /\n\z/;
+    return md5_hex($first);
+}
+
+# The size of the text in a .gz file, from the last 4 bytes of the file (mod 2**32).
+sub _gz_text_size
+{
+    my ($file) = @_;
+    open(my $fh, '<:raw', $file) or return undef;
+    seek($fh, -4, 2) or return undef;
+    read($fh, my $bytes, 4) == 4 or return undef;
+    return unpack('V', $bytes);
+}
+
+# Is the text of $file the log described by history entry $e? True if the part that was read
+# of it ends with the line that ended it before.
+sub _same_log
+{
+    my ($self, $file, $e) = @_;
+    return 1 unless $e->{offset};                   # nothing was read of it: nothing to compare
+    return 0 unless $e->{taillen} and defined $e->{tail} and $e->{offset} >= $e->{taillen};
+    my $fh = $self->_open_log($file);
+    my $before = $e->{offset} - $e->{taillen};
+    if (_is_compressed($file)) {
+        my $left = $before;
+        while ($left > 0) {
+            my $n = read($fh, my $skipped, $left > 65536 ? 65536 : $left);
+            last unless $n;
+            $left -= $n;
+        }
+        if ($left) { close $fh; return 0; }
+    } else {
+        unless (seek($fh, $before, 0)) { close $fh; return 0; }
+    }
+    my $got = read($fh, my $buf, $e->{taillen});
+    close $fh;
+    return (defined $got and $got == $e->{taillen} and md5_hex($buf) eq $e->{tail}) ? 1 : 0;
+}
+
+# What was added to a log since the last run, as (stats, lines) of just that part; an empty list
+# if there is nothing new. Records how far the log was read in the history.
+sub _history_delta
+{
+    my ($self, $h, $file) = @_;
+    $file = File::Spec->rel2abs($file);
+    my @st = stat($file) or return;                 # gone: its statistics are in the history
+    my ($size, $mtime) = @st[7, 9];
+    my $logs = $h->{logs};
+
+    my $e = $logs->{$file};
+    return if $e and $e->{size} == $size and $e->{mtime} == $mtime;     # not changed
+
+    my $fp = $self->_fingerprint($file);
+    return unless defined $fp;                      # empty, or the first line is not complete yet
+
+    # which log is this: the one that was read under this name, or one that was renamed,
+    # compressed or moved (its old name is gone), or a new one?
+    my $known;
+    if ($e) {
+        if ($e->{fp} eq $fp and $self->_same_log($file, $e)) {
+            $known = $e;
+        } else {
+            print "replaced by a new log, " unless $self->{cfg}->{silent};
+            delete $logs->{$file};
+        }
+    }
+    unless ($known) {
+        foreach my $path (sort keys %$logs) {
+            my $c = $logs->{$path};
+            next unless $c->{fp} eq $fp and $c->{offset};
+            next if -e $path;                       # still there under its own name: a different log
+            next unless $self->_same_log($file, $c);
+            $known = delete $logs->{$path};
+            print "same log as $path, " unless $self->{cfg}->{silent};
+            last;
+        }
+    }
+
+    my $skip = $known ? $known->{offset} : 0;
+    if ($skip) {
+        my $text = _is_compressed($file) ? ($file =~ /\.gz$/ ? _gz_text_size($file) : undef) : $size;
+        if (defined $text and $text == $skip % 4294967296) {
+            # everything in it was read already
+            $logs->{$file} = { %$known, size => $size, mtime => $mtime };
+            $h->{dirty} = 1;
+            return;
+        }
+    }
+
+    my %progress;
+    my $s = {
+        oldtime => 24, days => 0, firsttime => 0, lastnick => '',
+        parsedlines => 0, totallines => 0,
+    };
+    my $l = {};
+    # a log that goes on where it stopped goes on with who spoke last, too
+    if ($known and ref $known->{state} eq 'HASH') {
+        $s->{$_} = $known->{state}{$_} foreach keys %{$known->{state}};
+    }
+    $self->_parse_file($s, $l, $file, $skip, \%progress);
+    if ($progress{short}) {
+        print STDERR "Warning: $file is shorter than what was read of it before; leaving it as it was.\n";
+        $logs->{$file} = $known if $known;
+        return;
+    }
+
+    # a log that ends in a line still being written is looked at again next time, whatever its size
+    $logs->{$file} = {
+        fp => $fp, offset => $progress{offset},
+        tail => (defined $progress{tail} ? $progress{tail} : ($known && $known->{tail})),
+        taillen => (defined $progress{tail} ? $progress{taillen} : ($known && $known->{taillen})),
+        size => ($progress{partial} ? -1 : $size), mtime => $mtime,
+        state => { map { defined $s->{$_} ? ($_ => $s->{$_}) : () } qw(lastnick monocount lastnormal rel_lastnick) },
+    };
+    $h->{dirty} = 1;
+    return unless $s->{days};                       # no line of it was used
+    return ($s, $l);
 }
 
 sub _merge_stats
