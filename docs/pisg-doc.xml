@@ -1150,7 +1150,11 @@
     <para>
     What was read is not read again, so a change of settings (words to ignore,
     <xref linkend="Charset" /> and so on) does not change the statistics that
-    are already in the history; it applies to what is read from now on. To
+    are already in the history; it applies to what is read from now on. That
+    includes aliases and ignored nicks: if you add
+    <command>&lt;user nick="irc_user" alias="irc_user_mobile"&gt;</command>
+    later, the part of the history from before it still shows the two nicks as
+    two rows. Decide on aliases and ignores before the logs are deleted. To
     start again from the logs that still exist, run once with
     <command>-cf HistoryRebuild=1</command>: the old history is kept aside as
     <filename>.pisghist.TIME.old</filename>, and what only it contained is not
