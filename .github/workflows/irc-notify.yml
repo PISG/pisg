@@ -7,6 +7,7 @@ on:
   create:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   notify:
@@ -79,3 +80,16 @@ jobs:
           notice: true
           message: |
             [${{ github.event.repository.name }}] New release ${{ github.event.release.tag_name }}: ${{ github.event.release.html_url }}
+
+      - name: irc manual test
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          server: irc.undernet.org
+          port: 6667
+          tls: false
+          channel: "#pisg"
+          nickname: pisg-github
+          notice: true
+          message: |
+            [${{ github.event.repository.name }}] test notification triggered by ${{ github.actor }}
