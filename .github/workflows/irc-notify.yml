@@ -36,7 +36,7 @@ jobs:
           port: 6667
           tls: false
           channel: "#pisg"
-          nickname: pisg-github
+          nickname: github-pisg
           # NOTICE = message sent without joining the channel (works because #pisg is -n)
           notice: true
           message: |
@@ -50,7 +50,7 @@ jobs:
           port: 6667
           tls: false
           channel: "#pisg"
-          nickname: pisg-github
+          nickname: github-pisg
           notice: true
           message: |
             [${{ github.event.repository.name }}] ${{ github.actor }} ${{ github.event.pull_request.merged && 'merged' || github.event.action }} PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }} ${{ github.event.pull_request.html_url }}
@@ -63,7 +63,7 @@ jobs:
           port: 6667
           tls: false
           channel: "#pisg"
-          nickname: pisg-github
+          nickname: github-pisg
           notice: true
           message: |
             [${{ github.event.repository.name }}] ${{ github.actor }} tagged ${{ github.event.ref }}
@@ -76,7 +76,7 @@ jobs:
           port: 6667
           tls: false
           channel: "#pisg"
-          nickname: pisg-github
+          nickname: github-pisg
           notice: true
           message: |
             [${{ github.event.repository.name }}] New release ${{ github.event.release.tag_name }}: ${{ github.event.release.html_url }}
@@ -89,7 +89,7 @@ jobs:
           port: 6667
           tls: false
           channel: "#pisg"
-          nickname: pisg-github
+          nickname: github-pisg
           notice: true
           message: |
             [${{ github.event.repository.name }}] test notification triggered by ${{ github.actor }}
