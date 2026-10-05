@@ -1,0 +1,81 @@
+name: IRC Notify
+
+on:
+  push:
+  pull_request:
+    types: [opened, closed, reopened]
+  create:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    # Don't run on forks
+    if: github.repository == 'PISG/pisg'
+    steps:
+      - name: build push message
+        id: push
+        if: github.event_name == 'push' && github.event.commits[0] != null
+        env:
+          COMMITS: ${{ toJSON(github.event.commits) }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          count=$(echo "$COMMITS" | jq length)
+          # First line of the last commit only, to avoid flooding the channel
+          title=$(printf '%s\n' "$HEAD_MSG" | head -n1 | cut -c1-200)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      - name: irc push
+        uses: rectalogic/notify-irc@v1
+        if: steps.push.outcome == 'success'
+        with:
+          server: irc.undernet.org
+          port: 6667
+          tls: false
+          channel: "#pisg"
+          nickname: pisg-github
+          # NOTICE = message sent without joining the channel (works because #pisg is -n)
+          notice: true
+          message: |
+            [${{ github.event.repository.name }}] ${{ github.actor }} pushed ${{ steps.push.outputs.count }} commit(s) to ${{ github.ref_name }}: ${{ steps.push.outputs.title }} ${{ github.event.compare }}
+
+      - name: irc pull request
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'pull_request'
+        with:
+          server: irc.undernet.org
+          port: 6667
+          tls: false
+          channel: "#pisg"
+          nickname: pisg-github
+          notice: true
+          message: |
+            [${{ github.event.repository.name }}] ${{ github.actor }} ${{ github.event.pull_request.merged && 'merged' || github.event.action }} PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }} ${{ github.event.pull_request.html_url }}
+
+      - name: irc tag created
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'create' && github.event.ref_type == 'tag'
+        with:
+          server: irc.undernet.org
+          port: 6667
+          tls: false
+          channel: "#pisg"
+          nickname: pisg-github
+          notice: true
+          message: |
+            [${{ github.event.repository.name }}] ${{ github.actor }} tagged ${{ github.event.ref }}
+
+      - name: irc release
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'release'
+        with:
+          server: irc.undernet.org
+          port: 6667
+          tls: false
+          channel: "#pisg"
+          nickname: pisg-github
+          notice: true
+          message: |
+            [${{ github.event.repository.name }}] New release ${{ github.event.release.tag_name }}: ${{ github.event.release.html_url }}
