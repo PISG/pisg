@@ -9,87 +9,88 @@ on:
     types: [published]
   workflow_dispatch:
 
+env:
+  IRC_SERVER: irc.undernet.org
+  IRC_PORT: 6667
+  IRC_CHANNEL: "#pisg"
+  IRC_NICK: github-pisg
+
 jobs:
   notify:
     runs-on: ubuntu-latest
     # Don't run on forks
     if: github.repository == 'PISG/pisg'
     steps:
-      - name: build push message
-        id: push
-        if: github.event_name == 'push' && github.event.commits[0] != null
+      - name: build message
+        id: msg
         env:
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.event.repository.name }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
           COMMITS: ${{ toJSON(github.event.commits) }}
           HEAD_MSG: ${{ github.event.head_commit.message }}
+          COMPARE: ${{ github.event.compare }}
+          PR_ACTION: ${{ github.event.pull_request.merged && 'merged' || github.event.action }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REF_TYPE: ${{ github.event.ref_type }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
-          count=$(echo "$COMMITS" | jq length)
-          # First line of the last commit only, to avoid flooding the channel
-          title=$(printf '%s\n' "$HEAD_MSG" | head -n1 | cut -c1-200)
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "title=$title" >> "$GITHUB_OUTPUT"
+          case "$EVENT" in
+            push)
+              count=$(echo "$COMMITS" | jq length)
+              [ "$count" -gt 0 ] || exit 0
+              # First line of the last commit only, to avoid flooding the channel
+              title=$(printf '%s\n' "$HEAD_MSG" | head -n1 | cut -c1-200)
+              msg="[$REPO] $ACTOR pushed $count commit(s) to $REF_NAME: $title $COMPARE" ;;
+            pull_request)
+              msg="[$REPO] $ACTOR $PR_ACTION PR #$PR_NUMBER: $PR_TITLE $PR_URL" ;;
+            create)
+              [ "$REF_TYPE" = tag ] || exit 0
+              msg="[$REPO] $ACTOR tagged $REF_NAME" ;;
+            release)
+              msg="[$REPO] New release $RELEASE_TAG: $RELEASE_URL" ;;
+            workflow_dispatch)
+              msg="[$REPO] test notification triggered by $ACTOR" ;;
+          esac
+          echo "text=$msg" >> "$GITHUB_OUTPUT"
 
-      - name: irc push
-        uses: rectalogic/notify-irc@v1
-        if: steps.push.outcome == 'success'
-        with:
-          server: irc.undernet.org
-          port: 6667
-          tls: false
-          channel: "#pisg"
-          nickname: github-pisg
-          # NOTICE = message sent without joining the channel (works because #pisg is -n)
-          notice: true
-          message: |
-            [${{ github.event.repository.name }}] ${{ github.actor }} pushed ${{ steps.push.outputs.count }} commit(s) to ${{ github.ref_name }}: ${{ steps.push.outputs.title }} ${{ github.event.compare }}
-
-      - name: irc pull request
-        uses: rectalogic/notify-irc@v1
-        if: github.event_name == 'pull_request'
-        with:
-          server: irc.undernet.org
-          port: 6667
-          tls: false
-          channel: "#pisg"
-          nickname: github-pisg
-          notice: true
-          message: |
-            [${{ github.event.repository.name }}] ${{ github.actor }} ${{ github.event.pull_request.merged && 'merged' || github.event.action }} PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }} ${{ github.event.pull_request.html_url }}
-
-      - name: irc tag created
-        uses: rectalogic/notify-irc@v1
-        if: github.event_name == 'create' && github.event.ref_type == 'tag'
-        with:
-          server: irc.undernet.org
-          port: 6667
-          tls: false
-          channel: "#pisg"
-          nickname: github-pisg
-          notice: true
-          message: |
-            [${{ github.event.repository.name }}] ${{ github.actor }} tagged ${{ github.event.ref }}
-
-      - name: irc release
-        uses: rectalogic/notify-irc@v1
-        if: github.event_name == 'release'
-        with:
-          server: irc.undernet.org
-          port: 6667
-          tls: false
-          channel: "#pisg"
-          nickname: github-pisg
-          notice: true
-          message: |
-            [${{ github.event.repository.name }}] New release ${{ github.event.release.tag_name }}: ${{ github.event.release.html_url }}
-
-      - name: irc manual test
-        uses: rectalogic/notify-irc@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          server: irc.undernet.org
-          port: 6667
-          tls: false
-          channel: "#pisg"
-          nickname: github-pisg
-          notice: true
-          message: |
-            [${{ github.event.repository.name }}] test notification triggered by ${{ github.actor }}
+      # PRIVMSG straight to the channel without joining: needs #pisg to be -n and -r
+      - name: send to IRC
+        if: steps.msg.outputs.text != ''
+        env:
+          MESSAGE: ${{ steps.msg.outputs.text }}
+        shell: python
+        run: |
+          import os, socket, sys
+          chan, msg = os.environ["IRC_CHANNEL"], os.environ["MESSAGE"]
+          s = socket.create_connection((os.environ["IRC_SERVER"], int(os.environ["IRC_PORT"])), timeout=60)
+          f = s.makefile("r", encoding="utf-8", errors="replace")
+          def send(line):
+              s.sendall((line + "\r\n").encode())
+          send("NICK " + os.environ["IRC_NICK"])
+          send("USER %s 0 * :pisg GitHub notifier" % os.environ["IRC_NICK"])
+          ok = False
+          for line in f:
+              line = line.rstrip()
+              p = line.split()
+              if p[0] == "PING":
+                  send("PONG " + line[5:])
+              elif len(p) < 2:
+                  continue
+              elif p[1] == "001":
+                  send("PRIVMSG %s :%s" % (chan, msg))
+                  # VERSION reply (351) proves the PRIVMSG was processed before we quit
+                  send("VERSION")
+              elif p[1] in ("404", "403", "433", "432"):
+                  print(line)
+                  break
+              elif p[1] == "351":
+                  ok = True
+                  send("QUIT")
+                  break
+          s.close()
+          sys.exit(0 if ok else 1)
